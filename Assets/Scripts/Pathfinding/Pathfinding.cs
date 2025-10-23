@@ -16,8 +16,10 @@ public class Node //Node class that each node will have
 public class Pathfinding : MonoBehaviour
 {
     
-    private Queue<Node> frontier = new Queue<Node>();
+    private List<Node> frontier = new List<Node>();
     private HashSet<Node> cameFrom = new HashSet<Node>();
+    
+    private Dictionary<Vector3, Node> world = new Dictionary<Vector3, Node>();
     
     
     // Update is called once per frame
@@ -33,24 +35,25 @@ public class Pathfinding : MonoBehaviour
 
     private List<Node> ReconstructPath(Node n1)
     {
-        return new List<Node>(0); //Temp list
+        List<Node> path = new List<Node>();
+        Node current = n1;
+    
+        while (current != null)
+        {
+            path.Add(current);
+            current = current.parent;
+        }
+    
+        path.Reverse();
+        return path;
     }
 
     //Get the lowest F Cost
     private Node GetLowestFCost()
     {
-        Node lowest = null;
-        int lowestCost = int.MaxValue;
-
-        foreach (Node node in frontier)
-        {
-            if (node.f < lowestCost)
-            {
-                lowestCost = node.f;
-                lowest = node;
-            }
-        }
-        frontier.Enqueue(lowest);
+        frontier.Sort((a, b) => a.f.CompareTo(b.f));
+        Node lowest = frontier[0];
+        frontier.RemoveAt(0);
         return lowest;
     }
 
@@ -88,19 +91,34 @@ public class Pathfinding : MonoBehaviour
             // Check if this position is valid and create/get the node
             if (IsValid(neighborPos))
             {
-                //Node neighbor = GetOrCreateNode(neighborPos);
-                //neighbours.Add(neighbor);
+                Node neighbor = GetOrCreateNode(neighborPos);
+                neighbours.Add(neighbor);
             }
         }
     
         return neighbours;
     }
 
+    private Node GetOrCreateNode(Vector3 pos)
+    {
+        if (world.ContainsKey(pos))
+        {
+            return world[pos];
+        }
+        else
+        {
+            Node newNode = new Node();
+            newNode.position = pos;
+            world[pos] = newNode;
+            return newNode;
+        }
+    }
+
 
     public List<Node> A_Star(Node start, Node goal)
     {
-        //Intialize the Node properties
-        frontier.Enqueue(start);
+        //Initialize the Node properties
+        frontier.Add(start);
         cameFrom.Clear();
         
         //Bootstrap Case
@@ -120,7 +138,12 @@ public class Pathfinding : MonoBehaviour
             //Iterate through neighs
             foreach (Node neighbor in GetNeighbours(current))
             {
-                int tentativeG = current.g + GetCost(neighbor, goal);
+                
+                //Check if the node is already in the frontier
+                if (frontier.Contains(neighbor))
+                    continue;
+                
+                int tentativeG = current.g + GetCost(current, neighbor);
 
                 if (tentativeG < goal.g || !cameFrom.Contains(neighbor))
                 {
@@ -131,7 +154,7 @@ public class Pathfinding : MonoBehaviour
 
                     if (!frontier.Contains(neighbor))
                     {
-                        frontier.Enqueue(neighbor);
+                        frontier.Add(neighbor);
                     }
                 }
             }
