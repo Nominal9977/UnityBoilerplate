@@ -1,0 +1,64 @@
+using UnityEngine;
+using System.Collections.Generic;
+
+public class FlowFieldGenerator
+{
+    public struct InfluencePoint
+    {
+        public Vector2 Position;
+        public float Strength;
+        public bool IsAttraction;
+
+        public InfluencePoint(Vector2 position, float strength, bool isAttraction = true)
+        {
+            Position = position;
+            Strength = strength;
+            IsAttraction = isAttraction;
+        }
+    }
+
+    public Vector2[,] GenerateFlowField(int width, int height, List<InfluencePoint> influencePoints)
+    {
+        Vector2[,] flowField = new Vector2[width, height];
+
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                Vector2 currentPos = new Vector2(x, y);
+                flowField[x, y] = CalculateFlowVectorAtPoint(currentPos, influencePoints);
+            }
+        }
+
+        return flowField;
+    }
+
+    private Vector2 CalculateFlowVectorAtPoint(Vector2 point, List<InfluencePoint> influencePoints)
+    {
+        Vector2 resultantFlow = Vector2.zero;
+
+        foreach (var influencePoint in influencePoints)
+        {
+            Vector2 vectorToInfluence = influencePoint.Position - point;
+            float distance = vectorToInfluence.magnitude;
+
+            // Inverse square falloff
+            float falloff = 1f / (distance * distance + 1f);
+
+            // Attraction vs Repulsion Explanation:
+            // IsAttraction determines the direction of influence
+            // - If true (attraction), points TOWARDS the influence point
+            // - If false (repulsion), points AWAY from the influence point
+            float directionMultiplier = influencePoint.IsAttraction ? 1 : -1;
+
+            Vector2 influenceVector = vectorToInfluence.normalized *
+                influencePoint.Strength *
+                falloff *
+                directionMultiplier;
+
+            resultantFlow += influenceVector;
+        }
+
+        return resultantFlow.normalized;
+    }
+}
