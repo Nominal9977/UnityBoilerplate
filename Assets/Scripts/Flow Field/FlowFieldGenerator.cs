@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-public class FlowFieldGenerator
+public class FlowFieldGenerator: MonoBehaviour
 {
     public struct InfluencePoint
     {
@@ -33,24 +33,24 @@ public class FlowFieldGenerator
         return flowField;
     }
 
-    private Vector2 CalculateFlowVectorAtPoint(Vector2 point, List<InfluencePoint> influencePoints)
+    private Vector2 CalculateFlowVectorAtPoint(
+    Vector2 point,
+    List<InfluencePoint> influencePoints)
     {
         Vector2 resultantFlow = Vector2.zero;
 
         foreach (var influencePoint in influencePoints)
         {
-            Vector2 vectorToInfluence = influencePoint.Position - point;
+            Vector2 vectorToInfluence = point - influencePoint.Position;  // Reversed subtraction
             float distance = vectorToInfluence.magnitude;
 
             // Inverse square falloff
             float falloff = 1f / (distance * distance + 1f);
 
-            // Attraction vs Repulsion Explanation:
-            // IsAttraction determines the direction of influence
-            // - If true (attraction), points TOWARDS the influence point
-            // - If false (repulsion), points AWAY from the influence point
+            // Determine attraction or repulsion
             float directionMultiplier = influencePoint.IsAttraction ? 1 : -1;
 
+            // Scale vector by strength and falloff
             Vector2 influenceVector = vectorToInfluence.normalized *
                 influencePoint.Strength *
                 falloff *
