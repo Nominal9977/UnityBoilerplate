@@ -13,7 +13,7 @@ GameObject:
   - component: {fileID: 2375318426969377201}
   - component: {fileID: 135416347596559333}
   m_Layer: 0
-  m_Name: Edited
+  m_Name: Attration Point
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -62,7 +62,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: edf77f6568ccab84ab13db30d8876790, type: 2}
+  - {fileID: 2100000, guid: 2cf73e2f54e1f2c4f88db50a8d964632, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

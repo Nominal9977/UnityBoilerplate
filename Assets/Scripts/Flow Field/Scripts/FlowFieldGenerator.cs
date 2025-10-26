@@ -1,14 +1,12 @@
 using UnityEngine;
 using System.Collections.Generic;
-
-public class FlowFieldGenerator: MonoBehaviour
+public static class FlowFieldGenerator
 {
     public struct InfluencePoint
     {
         public Vector2 Position;
         public float Strength;
         public bool IsAttraction;
-
         public InfluencePoint(Vector2 position, float strength, bool isAttraction = true)
         {
             Position = position;
@@ -16,11 +14,9 @@ public class FlowFieldGenerator: MonoBehaviour
             IsAttraction = isAttraction;
         }
     }
-
-    public Vector2[,] GenerateFlowField(int width, int height, List<InfluencePoint> influencePoints)
+    public static Vector2[,] GenerateFlowField(int width, int height, List<InfluencePoint> influencePoints)
     {
         Vector2[,] flowField = new Vector2[width, height];
-
         for (int x = 0; x < width; x++)
         {
             for (int y = 0; y < height; y++)
@@ -29,36 +25,23 @@ public class FlowFieldGenerator: MonoBehaviour
                 flowField[x, y] = CalculateFlowVectorAtPoint(currentPos, influencePoints);
             }
         }
-
         return flowField;
     }
-
-    private Vector2 CalculateFlowVectorAtPoint(
-    Vector2 point,
-    List<InfluencePoint> influencePoints)
+    private static Vector2 CalculateFlowVectorAtPoint(Vector2 point, List<InfluencePoint> influencePoints)
     {
         Vector2 resultantFlow = Vector2.zero;
-
         foreach (var influencePoint in influencePoints)
         {
-            Vector2 vectorToInfluence = point - influencePoint.Position;  // Reversed subtraction
+            Vector2 vectorToInfluence = point - influencePoint.Position;
             float distance = vectorToInfluence.magnitude;
-
-            // Inverse square falloff
             float falloff = 1f / (distance * distance + 1f);
-
-            // Determine attraction or repulsion
             float directionMultiplier = influencePoint.IsAttraction ? 1 : -1;
-
-            // Scale vector by strength and falloff
             Vector2 influenceVector = vectorToInfluence.normalized *
                 influencePoint.Strength *
                 falloff *
                 directionMultiplier;
-
             resultantFlow += influenceVector;
         }
-
         return resultantFlow.normalized;
     }
 }
