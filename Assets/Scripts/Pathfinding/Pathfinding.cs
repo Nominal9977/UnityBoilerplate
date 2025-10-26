@@ -22,6 +22,28 @@ public class Pathfinding : MonoBehaviour
     private Dictionary<Vector3, Node> world = new Dictionary<Vector3, Node>();
     
     
+    // Start is called before the first frame update
+    void Start()
+    {
+        
+    
+        // // Start pathfinding
+        // StartPathfinding(startNode, goalNode, (path) => {
+        //     if (path != null)
+        //     {
+        //         Debug.Log("Path found with " + path.Count + " nodes");
+        //         foreach (Node node in path)
+        //         {
+        //             Debug.Log("Node position: " + node.position);
+        //         }
+        //     }
+        //     else
+        //     {
+        //         Debug.Log("No path found");
+        //     }
+        // });
+    }
+    
     // Update is called once per frame
     void Update()
     {
@@ -115,34 +137,31 @@ public class Pathfinding : MonoBehaviour
     }
 
 
-    public List<Node> A_Star(Node start, Node goal)
+    public IEnumerator A_Star_Coroutine(Node start, Node goal, System.Action<List<Node>> onComplete)
     {
-        //Initialize the Node properties
         frontier.Add(start);
         cameFrom.Clear();
-        
-        //Bootstrap Case
+    
         start.g = 0;
         start.h = Huristic(start, goal);
         start.f = start.g + start.h;
         start.parent = null;
-        
-        //Now go through and pathfind
+    
         while(frontier.Count > 0)
         {
             Node current = GetLowestFCost();
 
             if (current == goal)
-                return ReconstructPath(current);
+            {
+                yield return ReconstructPath(current);
+                yield break;
+            }
 
-            //Iterate through neighs
             foreach (Node neighbor in GetNeighbours(current))
             {
-                
-                //Check if the node is already in the frontier
                 if (frontier.Contains(neighbor))
                     continue;
-                
+            
                 int tentativeG = current.g + GetCost(current, neighbor);
 
                 if (tentativeG < goal.g || !cameFrom.Contains(neighbor))
@@ -158,11 +177,17 @@ public class Pathfinding : MonoBehaviour
                     }
                 }
             }
+        
+            // Yield every iteration or every N iterations for performance
+            yield return null;
         }
-        
-        
-        
-        return null;
+    
+        onComplete?.Invoke(null);
+    }
+    
+    public void StartPathfinding(Node start, Node goal, System.Action<List<Node>> onComplete)
+    {
+        StartCoroutine(A_Star_Coroutine(start, goal, onComplete));
     }
     
 }
