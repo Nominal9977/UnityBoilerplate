@@ -17,7 +17,8 @@ public class MapGeneration : MonoBehaviour
     private List<GameObject> mapCells = new List<GameObject>();
     private List<GameObject> flowFieldArrows = new List<GameObject>();
     public List<FlowFieldGenerator.InfluencePoint> influencePoints = new List<FlowFieldGenerator.InfluencePoint>();
-    private List<GameObject> influencePointMarkers = new List<GameObject>();
+    public static List<GameObject> influencePointMarkers = new List<GameObject>();
+    public static HashSet<Vector2> influencePointPositions = new HashSet<Vector2>();
     private GameObject startPointMarkerInstance;
     private GameObject targetPointMarkerInstance;
     public static Vector2[,] flowField;
@@ -32,7 +33,6 @@ public class MapGeneration : MonoBehaviour
     {
         CreateStartAndTargetMarkers();
         CreateAllInfluencePointMarkers();
-        Debug.Log($"MapGeneration: Created all markers for {influencePoints.Count} influence points");
     }
     void CreateAllInfluencePointMarkers()
     {
@@ -82,17 +82,19 @@ public class MapGeneration : MonoBehaviour
     void InitializeInfluencePoints()
     {
         influencePoints.Clear();
+        influencePointPositions.Clear();
         influencePoints.Add(new FlowFieldGenerator.InfluencePoint(
             startPoint,
             1f,
             false
         ));
+        influencePointPositions.Add(startPoint);
         influencePoints.Add(new FlowFieldGenerator.InfluencePoint(
             targetPoint,
             2f,
             true
         ));
-        Debug.Log($"MapGeneration: Initialized {influencePoints.Count} base influence points (start=repulsion + target=attraction)");
+        influencePointPositions.Add(targetPoint);
     }
     private void CreateInfluencePointMarker(FlowFieldGenerator.InfluencePoint point)
     {
@@ -103,7 +105,6 @@ public class MapGeneration : MonoBehaviour
         }
         if (repulsionPointMarkerPrefab == null)
         {
-            Debug.LogWarning("No repulsion point marker prefab assigned!");
             return;
         }
         Vector3 markerPosition = new Vector3(
@@ -133,33 +134,28 @@ public class MapGeneration : MonoBehaviour
     {
         if (isAttraction && Vector2.Distance(position, targetPoint) > 0.1f)
         {
-            Debug.LogWarning("MapGeneration: Forcing user-created point to be repulsion. Only target point can be attraction.");
             isAttraction = false;
         }
-        Debug.Log($"MapGeneration: Adding repulsion point at ({position.x}, {position.y}) with strength {strength}");
         FlowFieldGenerator.InfluencePoint newPoint = new FlowFieldGenerator.InfluencePoint(position, strength, isAttraction);
         influencePoints.Add(newPoint);
+        influencePointPositions.Add(position);
         CreateInfluencePointMarker(newPoint);
         GenerateAndVisualizeFlowField();
-        Debug.Log($"MapGeneration: Now managing {influencePoints.Count} total influence points");
     }
     public void RemoveInfluencePoint(FlowFieldGenerator.InfluencePoint point)
     {
-        Debug.Log($"MapGeneration: Removing {(point.IsAttraction ? "attraction" : "repulsion")} point at ({point.Position.x}, {point.Position.y})");
         influencePoints.Remove(point);
+        influencePointPositions.Remove(point.Position);
         CreateAllInfluencePointMarkers();
         GenerateAndVisualizeFlowField();
-        Debug.Log($"MapGeneration: Now managing {influencePoints.Count} total influence points");
     }
     public void RegenerateFlowField()
     {
-        Debug.Log("MapGeneration: Regenerating entire flow field system");
         CreateAllMarkers();
         GenerateAndVisualizeFlowField();
     }
     public void SetStartAndTargetPoints(Vector2 start, Vector2 target)
     {
-        Debug.Log($"MapGeneration: Setting start to ({start.x}, {start.y}) and target to ({target.x}, {target.y})");
         startPoint = start;
         targetPoint = target;
         ReInitializeAllInfluencePoints();
@@ -168,19 +164,57 @@ public class MapGeneration : MonoBehaviour
     }
     public void SetStartPoint(Vector2 newStartPoint)
     {
-        Debug.Log($"MapGeneration: Setting start point to ({newStartPoint.x}, {newStartPoint.y})");
+        RemoveOldStartPoint();
         startPoint = newStartPoint;
-        ReInitializeAllInfluencePoints();
+        AddNewStartPoint();
         CreateAllMarkers();
         GenerateAndVisualizeFlowField();
     }
     public void SetTargetPoint(Vector2 newTargetPoint)
     {
-        Debug.Log($"MapGeneration: Setting target point to ({newTargetPoint.x}, {newTargetPoint.y})");
+        RemoveOldTargetPoint();
         targetPoint = newTargetPoint;
-        ReInitializeAllInfluencePoints();
+        AddNewTargetPoint();
         CreateAllMarkers();
         GenerateAndVisualizeFlowField();
+    }
+    void RemoveOldStartPoint()
+    {
+        for (int i = influencePoints.Count - 1; i >= 0; i--)
+        {
+            var point = influencePoints[i];
+            bool isOldStartPoint = !point.IsAttraction && Vector2.Distance(point.Position, startPoint) < 0.1f;
+            if (isOldStartPoint)
+            {
+                influencePointPositions.Remove(point.Position);
+                influencePoints.RemoveAt(i);
+                break;
+            }
+        }
+    }
+    void RemoveOldTargetPoint()
+    {
+        for (int i = influencePoints.Count - 1; i >= 0; i--)
+        {
+            var point = influencePoints[i];
+            bool isOldTargetPoint = point.IsAttraction && Vector2.Distance(point.Position, targetPoint) < 0.1f;
+            if (isOldTargetPoint)
+            {
+                influencePointPositions.Remove(point.Position);
+                influencePoints.RemoveAt(i);
+                break;
+            }
+        }
+    }
+    void AddNewStartPoint()
+    {
+        influencePoints.Add(new FlowFieldGenerator.InfluencePoint(startPoint, 1f, false));
+        influencePointPositions.Add(startPoint);
+    }
+    void AddNewTargetPoint()
+    {
+        influencePoints.Add(new FlowFieldGenerator.InfluencePoint(targetPoint, 2f, true));
+        influencePointPositions.Add(targetPoint);
     }
     void ReInitializeAllInfluencePoints()
     {
@@ -198,12 +232,27 @@ public class MapGeneration : MonoBehaviour
         foreach (var customPoint in customPoints)
         {
             influencePoints.Add(customPoint);
+            influencePointPositions.Add(customPoint.Position);
         }
-        Debug.Log($"MapGeneration: Reinitialized with {customPoints.Count} custom points + 2 base points = {influencePoints.Count} total");
     }
     public List<FlowFieldGenerator.InfluencePoint> GetInfluencePoints()
     {
         return new List<FlowFieldGenerator.InfluencePoint>(influencePoints);
+    }
+    public static bool IsPositionBlocked(Vector2 position)
+    {
+        return influencePointPositions.Contains(position);
+    }
+    public bool IsPositionBlockedWithinRadius(Vector2 position, float radius = 0.5f)
+    {
+        foreach (var influencePos in influencePointPositions)
+        {
+            if (Vector2.Distance(position, influencePos) <= radius)
+            {
+                return true;
+            }
+        }
+        return false;
     }
     void GenerateMap()
     {
@@ -265,14 +314,12 @@ public class MapGeneration : MonoBehaviour
     }
     void GenerateAndVisualizeFlowField()
     {
-        Debug.Log($"MapGeneration: Generating flow field from {influencePoints.Count} influence points");
         flowField = FlowFieldGenerator.GenerateFlowField(
             mapWidth,
             mapHeight,
             influencePoints
         );
         VisualizeFlowField();
-        Debug.Log("MapGeneration: Flow field generated and visualized");
     }
     void VisualizeFlowField()
     {
@@ -326,7 +373,6 @@ public class MapGeneration : MonoBehaviour
     }
     public void RegenerateMap()
     {
-        Debug.Log("MapGeneration: Regenerating entire map system");
         GenerateMap();
         ReInitializeAllInfluencePoints();
         CreateAllMarkers();

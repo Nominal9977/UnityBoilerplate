@@ -89,7 +89,6 @@ public class FlowFieldGUI : MonoBehaviour
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Invalid start point input: {e.Message}");
             UpdateStatusText("Error: Invalid start point input");
         }
     }
@@ -109,7 +108,6 @@ public class FlowFieldGUI : MonoBehaviour
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Invalid target point input: {e.Message}");
             UpdateStatusText("Error: Invalid target point input");
         }
     }
@@ -139,7 +137,6 @@ public class FlowFieldGUI : MonoBehaviour
         }
         catch (System.Exception e)
         {
-            Debug.LogError($"Invalid influence point input: {e.Message}");
             UpdateStatusText("Error: Invalid influence point input");
         }
     }
@@ -163,7 +160,6 @@ public class FlowFieldGUI : MonoBehaviour
     {
         if (influenceListItemPrefab == null || influenceListContent == null)
         {
-            Debug.LogWarning("Influence list prefab or content transform not assigned!");
             return;
         }
         GameObject listItem = Instantiate(influenceListItemPrefab, influenceListContent);
@@ -268,7 +264,6 @@ public class FlowFieldGUI : MonoBehaviour
         if (statusText != null)
         {
             statusText.text = message;
-            Debug.Log($"FlowField Status: {message}");
         }
     }
     public void RefreshGUI()

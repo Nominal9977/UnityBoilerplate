@@ -1869,7 +1869,7 @@ MonoBehaviour:
   arrowPrefab: {fileID: 3608728241517720550, guid: 5cf143e5ad4ef79459b42292d720277d, type: 3}
   startPointMarkerPrefab: {fileID: 7539365460956794899, guid: 041e6ed8f7827904695c1ba8795f84af, type: 3}
   targetPointMarkerPrefab: {fileID: 927773639204996189, guid: 4b65df0de778a04419a8c5de2a626b02, type: 3}
-  influencePointMarkerPrefab: {fileID: 927773639204996189, guid: 53b711d6811241a41bf2d45e3c939371, type: 3}
+  repulsionPointMarkerPrefab: {fileID: 927773639204996189, guid: 53b711d6811241a41bf2d45e3c939371, type: 3}
   startPoint: {x: 0, y: 0}
   targetPoint: {x: 15, y: 9}
 --- !u!4 &883136424
@@ -1919,7 +1919,6 @@ MonoBehaviour:
   influenceXInput: {fileID: 628934272}
   influenceYInput: {fileID: 1603111462}
   influenceStrengthInput: {fileID: 1324047764}
-  influenceTypeToggle: {fileID: 1921166626}
   addInfluenceButton: {fileID: 152606982}
   regenerateButton: {fileID: 1032362327}
   clearAllInfluenceButton: {fileID: 0}
