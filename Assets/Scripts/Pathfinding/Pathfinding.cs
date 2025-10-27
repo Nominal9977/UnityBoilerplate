@@ -21,38 +21,41 @@ public class Pathfinding : MonoBehaviour
     
     private Dictionary<Vector3, Node> world = new Dictionary<Vector3, Node>();
     
-    
+    [SerializeField] public MapGeneration mapGen;
+
     // Start is called before the first frame update
     void Start()
     {
-        
-    
-        // // Start pathfinding
-        // StartPathfinding(startNode, goalNode, (path) => {
-        //     if (path != null)
-        //     {
-        //         Debug.Log("Path found with " + path.Count + " nodes");
-        //         foreach (Node node in path)
-        //         {
-        //             Debug.Log("Node position: " + node.position);
-        //         }
-        //     }
-        //     else
-        //     {
-        //         Debug.Log("No path found");
-        //     }
-        // });
+        StartCoroutine(WaitForFlowFieldAndInitialize());
     }
     
-    // Update is called once per frame
-    void Update()
+    
+    private int Heuristic(Node n1, Node n2, List<FlowUtility.InfluencePoint> influencePoints)
     {
-        
-    }
+        Vector2 pos2D = new Vector2(n1.position.x, n1.position.z);
+        Vector2 goal2D = new Vector2(n2.position.x, n2.position.z);
+        Vector2 directionToGoal = (goal2D - pos2D).normalized;
 
-    private int Huristic(Node n1, Node n2)
-    {
-        return (int)Vector3.Distance(n1.position, n2.position);
+        // Get array dimensions
+        int width = MapGeneration.flowField.GetLength(0);
+        int height = MapGeneration.flowField.GetLength(1);
+    
+        // Clamp positions to valid range
+        int x = Mathf.Clamp((int)pos2D.x, 0, width - 1);
+        int y = Mathf.Clamp((int)pos2D.y, 0, height - 1);
+    
+        // Get flow vector at this point
+        var flowVector = MapGeneration.flowField[x, y];
+
+        // Calculate flow alignment
+        float flowAlignment = Vector2.Dot(directionToGoal, flowVector);
+
+        float distance = Vector2.Distance(pos2D, goal2D);
+
+        // Apply flow bonus/penalty to heuristic
+        float heuristic = distance * (1f - (flowAlignment * 0.3f));
+
+        return (int)heuristic;
     }
 
     private List<Node> ReconstructPath(Node n1)
@@ -87,11 +90,12 @@ public class Pathfinding : MonoBehaviour
 
     private bool IsValid(Vector3 pos)
     {
-        //Loop through all nodes and check to see if that pos is in the frontier
-        foreach (Node node in frontier)
+        bool isPositionBlocked = MapGeneration.IsPositionBlocked(pos);
+        
+        // If the position isnt blocked return true
+        if (!isPositionBlocked)
         {
-            if (node.position == pos)
-                return true;
+            return true;
         }
         return false;
     }
@@ -137,57 +141,139 @@ public class Pathfinding : MonoBehaviour
     }
 
 
-    public IEnumerator A_Star_Coroutine(Node start, Node goal, System.Action<List<Node>> onComplete)
+    public IEnumerator A_Star_Coroutine(Node start, Node goal, List<FlowUtility.InfluencePoint> influencePoints, System.Action<List<Node>> onComplete)
     {
         frontier.Add(start);
         cameFrom.Clear();
-    
+
         start.g = 0;
-        start.h = Huristic(start, goal);
+        start.h = Heuristic(start, goal, influencePoints);
         start.f = start.g + start.h;
         start.parent = null;
-    
+
+        int iterations = 0;
+        Debug.Log("A* Search started");
+
         while(frontier.Count > 0)
         {
             Node current = GetLowestFCost();
+            iterations++;
 
-            if (current == goal)
+            if (iterations % 100 == 0)
             {
-                yield return ReconstructPath(current);
+                Debug.Log($"A* Iteration {iterations}, Frontier size: {frontier.Count}");
+            }
+
+            if (current.position == goal.position)
+            {
+                Debug.Log($"Goal found after {iterations} iterations!");
+                List<Node> path = ReconstructPath(current);
+                onComplete?.Invoke(path);
                 yield break;
             }
+            
+            cameFrom.Add(current);
 
             foreach (Node neighbor in GetNeighbours(current))
             {
-                if (frontier.Contains(neighbor))
+                //Check if visited already
+                if (cameFrom.Contains(neighbor))
                     continue;
-            
+    
                 int tentativeG = current.g + GetCost(current, neighbor);
 
-                if (tentativeG < goal.g || !cameFrom.Contains(neighbor))
+                // If neighbor is not in frontier, add it
+                if (!frontier.Contains(neighbor))
                 {
                     neighbor.g = tentativeG;
-                    neighbor.h = Huristic(neighbor, goal);
+                    neighbor.h = Heuristic(neighbor, goal, influencePoints);
                     neighbor.f = neighbor.g + neighbor.h;
                     neighbor.parent = current;
-
-                    if (!frontier.Contains(neighbor))
-                    {
-                        frontier.Add(neighbor);
-                    }
+                    frontier.Add(neighbor);
+                }
+                // If we found a better path to this neighbor, update it
+                else if (tentativeG < neighbor.g)
+                {
+                    neighbor.g = tentativeG;
+                    neighbor.f = neighbor.g + neighbor.h;
+                    neighbor.parent = current;
                 }
             }
-        
-            // Yield every iteration or every N iterations for performance
+
             yield return null;
         }
-    
+
+        Debug.Log($"No path found after {iterations} iterations. Frontier empty.");
         onComplete?.Invoke(null);
     }
     
-    public void StartPathfinding(Node start, Node goal, System.Action<List<Node>> onComplete)
+    public void StartPathfinding(Node start, Node goal, List<FlowUtility.InfluencePoint> influencePoints, System.Action<List<Node>> onComplete)
     {
-        StartCoroutine(A_Star_Coroutine(start, goal, onComplete));
+        StartCoroutine(A_Star_Coroutine(start, goal, influencePoints, onComplete));
+    }
+    
+    //Set the world grid
+    private void SetWorldGrid()
+    {
+        var flowField = MapGeneration.flowField;
+    
+        Debug.Log($"Loading {flowField.Length} positions from flowField");
+        for (int x = 0; x < mapGen.mapWidth; x++)
+        {
+            for (int y = 0; y < mapGen.mapHeight; y++)
+            {
+                Vector3 pos = new Vector3(x, 0, y);
+                var node = GetOrCreateNode(pos);
+            }
+        }
+        
+        Debug.Log($"Loaded {world.Count} nodes into world");
+    }
+    
+    private IEnumerator WaitForFlowFieldAndInitialize()
+    {
+        // Wait until flowField is populated
+        while (MapGeneration.flowField == null || MapGeneration.flowField.Length == 0)
+        {
+            Debug.Log("Waiting for MapGeneration.flowField to be populated...");
+            yield return new WaitForSeconds(0.1f); // Check every 0.1 seconds
+        }
+    
+        Debug.Log("FlowField is ready!");
+        SetWorldGrid();
+    
+        // Now initialize pathfinding
+        if (world.Count < 2)
+        {
+            Debug.LogError("Not enough nodes in world to pathfind");
+            yield break;
+        }
+        
+        Node startNode = GetOrCreateNode(mapGen.startPoint);
+        Node goalNode = GetOrCreateNode(mapGen.targetPoint);
+        
+
+        Debug.Log($"Starting pathfind from {startNode.position} to {goalNode.position}");
+
+        StartPathfinding(startNode, goalNode, mapGen.influencePoints, (path) => {            
+            if (path != null)
+            {
+                Debug.Log("===== PATH FOUND =====");
+                Debug.Log("Total nodes in path: " + path.Count);
+                Debug.Log("===== PATH NODES =====");
+        
+                for (int i = 0; i < path.Count; i++)
+                {
+                    Debug.Log($"[{i}]: {path[i].position}");
+                }
+        
+                Debug.Log("===== END PATH =====");
+            }
+            else
+            {
+                Debug.Log("No path found");
+            }
+        });
     }
     
 }
