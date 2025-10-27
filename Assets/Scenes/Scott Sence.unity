@@ -1924,7 +1924,7 @@ MonoBehaviour:
   clearAllInfluenceButton: {fileID: 0}
   influenceScrollRect: {fileID: 643172088}
   influenceListContent: {fileID: 643172087}
-  influenceListItemPrefab: {fileID: 643172086}
+  influenceListItemPrefab: {fileID: 0}
   statusText: {fileID: 0}
 --- !u!1 &895985242
 GameObject:
@@ -3007,8 +3007,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1517369225}
   m_HandleRect: {fileID: 1517369224}
   m_Direction: 2
-  m_Value: 1
-  m_Size: 0.60999995
+  m_Value: 1.0000002
+  m_Size: 0.6100001
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
@@ -3214,8 +3214,8 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 1284089347}
   m_HandleRect: {fileID: 1284089346}
   m_Direction: 0
-  m_Value: 1
-  m_Size: 0.99999994
+  m_Value: 0
+  m_Size: 1
   m_NumberOfSteps: 0
   m_OnValueChanged:
     m_PersistentCalls:
