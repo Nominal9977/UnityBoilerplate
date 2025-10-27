@@ -58,37 +58,26 @@ public class Smoother
     }
 }
 
-enum NormalDirections
+enum Directions
 {
     North = 1,
     South,
     West,
     East,
-    NormalDirection
-}
-
-enum DiagonalDirections
-{
-    North_East = NormalDirections.NormalDirection,
+    North_East,
     North_West,
     South_East,
     South_West,
     DiagonalDirection
 }
 
-enum TurnDirection
-{
-    Left = DiagonalDirections.DiagonalDirection,
-    Right,
-    Straight
-}
 public class PathSmoothing : MonoBehaviour
 {
     List<Node> node_list = new List<Node>();
     List<Smoother> final_path = new List<Smoother>();
 
     int smoother_index = 0;
-    int last_exit = (int)NormalDirections.South;
+    int last_exit = (int)Directions.South;
 
     public void SetPath(List<Node> path) {
         // Update Path
@@ -119,7 +108,7 @@ public class PathSmoothing : MonoBehaviour
             Vector3 difference_a = next_node_position - current_node_position;
             Vector3 difference_b = far_node_position - next_node_position;
 
-            if (last_exit <= (int)NormalDirections.East) // Normal Direction
+            if (last_exit <= (int)Directions.East) // Normal Direction
             {
                 if(difference_a == difference_b)
                 {
@@ -160,21 +149,21 @@ public class PathSmoothing : MonoBehaviour
     {
         switch(direction)
         {
-            case (int)NormalDirections.North:
+            case (int)Directions.North:
                 return new Vector3(0, 0, 1);
-            case (int)NormalDirections.South:
+            case (int)Directions.South:
                 return new Vector3(0, 0, -1);
-            case (int)NormalDirections.East:
+            case (int)Directions.East:
                 return new Vector3(1, 0, 0);
-            case (int)NormalDirections.West:
+            case (int)Directions.West:
                 return new Vector3(-1, 0, 0);
-            case (int)DiagonalDirections.North_East:
+            case (int)Directions.North_East:
                 return new Vector3(1, 0, 1);
-            case (int)DiagonalDirections.North_West:
+            case (int)Directions.North_West:
                 return new Vector3(-1, 0, 1);
-            case (int)DiagonalDirections.South_East:
+            case (int)Directions.South_East:
                 return new Vector3(1, 0, -1);
-            case (int)DiagonalDirections.South_West:
+            case (int)Directions.South_West:
                 return new Vector3(-1, 0, -1);
             default:
                 Debug.LogError("SHOULD NEVER REACH");
@@ -187,22 +176,44 @@ public class PathSmoothing : MonoBehaviour
     {
         if(difference.x > 0)
         {
-            return (int)NormalDirections.East;
-        } else
-        {
-            return (int)NormalDirections.West;
+            return (int)Directions.East;
+        }
+        if(difference.x < 0) {
+            return (int)Directions.West;
         }
 
         if(difference.z > 0)
         {
-            return (int)NormalDirections.North;
+            return (int)Directions.North;
         } else
         {
-            return (int)NormalDirections.South;
+            return (int)Directions.South;
         }
     } 
 
-    public Vector3 DifferenceToDirection()
+    public int DirectionEnumToOppositeDirectionEnum(int direction)
+    {
+        switch (direction)
+        {
+            case (int)Directions.North:
+                return (int)Directions.South;
+            case (int)Directions.South:
+                return (int)Directions.North;
+            case (int)Directions.East:
+                return (int)Directions.West;
+            case (int)Directions.West:
+                return (int)Directions.East;
+            case (int)Directions.North_East:
+                return (int)Directions.South_West;
+            case (int)Directions.North_West:
+                return (int)Directions.South_East;
+            case (int)Directions.South_East:
+                return (int)Directions.North_West;
+            case (int)Directions.South_West:
+                return (int)Directions.North_East;
+        }
+        return (int)Directions.North;
+    }
 
     // Start is called before the first frame update
     void Start()
@@ -227,7 +238,7 @@ public class PathSmoothing : MonoBehaviour
             // Make Node, Set Position, & Add To Node List
             Node new_node = new Node();
             new_node.position = current_position;
-            current_path.Add(new_node);
+            node_list.Add(new_node);
 
             // Pick A Random Of 4 Directions (x and z)
             Vector3 next_direction = directions[Random.Range(0, directions.Count)];
@@ -241,7 +252,7 @@ public class PathSmoothing : MonoBehaviour
         }
 
         // Set Path With Nodes
-        SetPath(current_path);
+        SetPath(node_list);
     }
 
     // Update is called once per frame
