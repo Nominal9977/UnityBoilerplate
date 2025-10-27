@@ -15,8 +15,8 @@ public class MapGeneration : MonoBehaviour
     public GameObject targetPointMarkerPrefab;
     public GameObject repulsionPointMarkerPrefab;
     
-    public static  Vector2 startPoint = new Vector2(0, 0);
-    public static Vector2 targetPoint = new Vector2(9, 9);
+    public Vector2 startPoint = new Vector2(0, 0);
+    public Vector2 targetPoint = new Vector2(9, 9);
 
     private List<GameObject> mapCells = new List<GameObject>();
     private List<GameObject> flowFieldArrows = new List<GameObject>();
