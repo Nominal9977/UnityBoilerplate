@@ -9,19 +9,19 @@ public class MapGeneration : MonoBehaviour
     public float cellPadding = 0.1f;
     public GameObject cellPrefab;
     public GameObject arrowPrefab;
-    
+
     [Header("Marker Prefabs")]
     public GameObject startPointMarkerPrefab;
     public GameObject targetPointMarkerPrefab;
     public GameObject repulsionPointMarkerPrefab;
-    
+
     public Vector2 startPoint = new Vector2(0, 0);
     public Vector2 targetPoint = new Vector2(9, 9);
 
     private List<GameObject> mapCells = new List<GameObject>();
     private List<GameObject> flowFieldArrows = new List<GameObject>();
     private Dictionary<string, GameObject> arrowMap = new Dictionary<string, GameObject>();
-    
+
     public List<FlowUtility.InfluencePoint> influencePoints = new List<FlowUtility.InfluencePoint>();
     private List<GameObject> influencePointMarkers = new List<GameObject>();
     private Dictionary<Vector2, GameObject> influenceMarkerMap = new Dictionary<Vector2, GameObject>();
@@ -40,10 +40,45 @@ public class MapGeneration : MonoBehaviour
             return;
         }
 
+        ResetAllLists();
+
         InitializeInfluencePoints();
         GenerateMap();
         CreateAllMarkers();
         GenerateAndVisualizeFlowField();
+    }
+
+    void ResetAllLists()
+    {
+        foreach (GameObject cell in mapCells)
+        {
+            if (cell != null)
+                Destroy(cell);
+        }
+        mapCells.Clear();
+
+        foreach (GameObject arrow in flowFieldArrows)
+        {
+            if (arrow != null)
+                Destroy(arrow);
+        }
+        flowFieldArrows.Clear();
+        arrowMap.Clear();
+
+        foreach (GameObject marker in influencePointMarkers)
+        {
+            if (marker != null)
+                Destroy(marker);
+        }
+        influencePointMarkers.Clear();
+        influenceMarkerMap.Clear();
+
+        DestroyStartAndTargetMarkers();
+
+        influencePoints.Clear();
+        influencePointPositions.Clear();
+
+        flowField = null;
     }
 
     void CreateAllMarkers()
@@ -56,12 +91,10 @@ public class MapGeneration : MonoBehaviour
     void CreateAllInfluencePointMarkers()
     {
         if (isUpdating) return;
-        
-        // Only remove markers that no longer exist
+
         var pointsToKeep = new HashSet<Vector2>();
         foreach (var point in influencePoints)
         {
-            // Skip start and target points
             if (Vector2.Distance(point.Position, startPoint) < 0.1f ||
                 Vector2.Distance(point.Position, targetPoint) < 0.1f)
             {
@@ -70,7 +103,6 @@ public class MapGeneration : MonoBehaviour
             pointsToKeep.Add(point.Position);
         }
 
-        // Remove markers for deleted points
         var keysToRemove = new List<Vector2>();
         foreach (var kvp in influenceMarkerMap)
         {
@@ -87,7 +119,6 @@ public class MapGeneration : MonoBehaviour
             influencePointMarkers.Remove(influenceMarkerMap[key]);
         }
 
-        // Create markers for new points
         foreach (var point in influencePoints)
         {
             if (Vector2.Distance(point.Position, startPoint) < 0.1f ||
@@ -101,6 +132,66 @@ public class MapGeneration : MonoBehaviour
                 CreateInfluencePointMarker(point);
             }
         }
+    }
+
+    public void SetMapDimensions(int newWidth, int newHeight)
+    {
+        if (newWidth <= 0 || newHeight <= 0)
+        {
+            Debug.LogError("Map dimensions must be greater than 0!");
+            return;
+        }
+
+        DestroyAllMapElements();
+
+        mapWidth = newWidth;
+        mapHeight = newHeight;
+
+        float clampedStartX = Mathf.Clamp(startPoint.x, 0, mapWidth - 1);
+        float clampedStartY = Mathf.Clamp(startPoint.y, 0, mapHeight - 1);
+        startPoint = new Vector2(clampedStartX, clampedStartY);
+
+        float clampedTargetX = Mathf.Clamp(targetPoint.x, 0, mapWidth - 1);
+        float clampedTargetY = Mathf.Clamp(targetPoint.y, 0, mapHeight - 1);
+        targetPoint = new Vector2(clampedTargetX, clampedTargetY);
+
+        influencePoints.Clear();
+        influencePointPositions.Clear();
+
+        InitializeInfluencePoints();
+        GenerateMap();
+        CreateAllMarkers();
+        GenerateAndVisualizeFlowField();
+
+        Debug.Log($"? Map resized to {newWidth}x{newHeight}. All influence points cleared and reinitialized.");
+    }
+
+    void DestroyAllMapElements()
+    {
+        foreach (GameObject cell in mapCells)
+        {
+            if (cell != null)
+                Destroy(cell);
+        }
+        mapCells.Clear();
+
+        foreach (GameObject arrow in flowFieldArrows)
+        {
+            if (arrow != null)
+                Destroy(arrow);
+        }
+        flowFieldArrows.Clear();
+        arrowMap.Clear();
+
+        foreach (GameObject marker in influencePointMarkers)
+        {
+            if (marker != null)
+                Destroy(marker);
+        }
+        influencePointMarkers.Clear();
+        influenceMarkerMap.Clear();
+
+        DestroyStartAndTargetMarkers();
     }
 
     void CreateStartAndTargetMarkers()
@@ -174,10 +265,6 @@ public class MapGeneration : MonoBehaviour
         influenceMarkerMap[point.Position] = marker;
     }
 
-    /// <summary>
-    /// Add influence point WITHOUT regenerating the flow field
-    /// Call RegenerateFlowField() manually when ready to update
-    /// </summary>
     public void AddInfluencePointWithoutRegen(Vector2 position, float strength, bool isAttraction)
     {
         if (isUpdating) return;
@@ -188,100 +275,67 @@ public class MapGeneration : MonoBehaviour
         FlowUtility.InfluencePoint newPoint = new FlowUtility.InfluencePoint(position, strength, isAttraction);
         influencePoints.Add(newPoint);
         influencePointPositions.Add(position);
-        
-        // Only create marker if it's not start/target point
+
         if (!(Vector2.Distance(position, startPoint) < 0.1f || Vector2.Distance(position, targetPoint) < 0.1f))
         {
             CreateInfluencePointMarker(newPoint);
         }
-        
-        // NO GenerateAndVisualizeFlowField() - that's called manually
     }
 
-    /// <summary>
-    /// Add influence point AND regenerate (old behavior, kept for compatibility)
-    /// </summary>
     public void AddInfluencePoint(Vector2 position, float strength, bool isAttraction)
     {
         AddInfluencePointWithoutRegen(position, strength, isAttraction);
         GenerateAndVisualizeFlowField();
     }
 
-    /// <summary>
-    /// Remove influence point WITHOUT regenerating the flow field
-    /// Call RegenerateFlowField() manually when ready to update
-    /// </summary>
-    public void RemoveInfluencePointWithoutRegen(FlowUtility.InfluencePoint point)
+    public void RemoveInfluencePointWithoutRegen(FlowUtility.InfluencePoint pointToRemove)
     {
         if (isUpdating) return;
-        influencePoints.Remove(point);
-        influencePointPositions.Remove(point.Position);
-        
-        // Remove marker if it exists
-        if (influenceMarkerMap.ContainsKey(point.Position))
+
+        for (int i = influencePoints.Count - 1; i >= 0; i--)
         {
-            if (influenceMarkerMap[point.Position] != null)
-                Destroy(influenceMarkerMap[point.Position]);
-            influenceMarkerMap.Remove(point.Position);
+            var point = influencePoints[i];
+            if (Vector2.Distance(point.Position, pointToRemove.Position) < 0.01f)
+            {
+                influencePointPositions.Remove(point.Position);
+
+                if (influenceMarkerMap.ContainsKey(point.Position))
+                {
+                    GameObject markerToDestroy = influenceMarkerMap[point.Position];
+                    if (markerToDestroy != null)
+                        Destroy(markerToDestroy);
+                    influenceMarkerMap.Remove(point.Position);
+                    influencePointMarkers.Remove(markerToDestroy);
+                }
+
+                influencePoints.RemoveAt(i);
+                break;
+            }
         }
-        
-        // NO GenerateAndVisualizeFlowField() - that's called manually
     }
 
-    /// <summary>
-    /// Remove influence point AND regenerate (old behavior, kept for compatibility)
-    /// </summary>
-    public void RemoveInfluencePoint(FlowUtility.InfluencePoint point)
+    public void RemoveInfluencePoint(FlowUtility.InfluencePoint pointToRemove)
     {
-        RemoveInfluencePointWithoutRegen(point);
+        RemoveInfluencePointWithoutRegen(pointToRemove);
         GenerateAndVisualizeFlowField();
-    }
-
-    public void RegenerateFlowField()
-    {
-        if (isUpdating) return;
-        CreateAllMarkers();
-        GenerateAndVisualizeFlowField();
-    }
-
-    public void SetStartAndTargetPoints(Vector2 start, Vector2 target)
-    {
-        if (isUpdating) return;
-        isUpdating = true;
-        startPoint = start;
-        targetPoint = target;
-        ReInitializeAllInfluencePoints();
-        CreateAllMarkers();
-        GenerateAndVisualizeFlowField();
-        isUpdating = false;
     }
 
     public void SetStartPoint(Vector2 newStartPoint)
     {
         if (isUpdating) return;
-        if (Vector2.Distance(newStartPoint, startPoint) < 0.01f) return;
-
-        isUpdating = true;
         RemoveOldStartPoint();
         startPoint = newStartPoint;
         AddNewStartPoint();
-        CreateAllMarkers();
-        GenerateAndVisualizeFlowField();
-        isUpdating = false;
+        CreateStartAndTargetMarkers();
     }
 
     public void SetTargetPoint(Vector2 newTargetPoint)
     {
         if (isUpdating) return;
-        if (Vector2.Distance(newTargetPoint, targetPoint) < 0.01f) return;
-
-        isUpdating = true;
         RemoveOldTargetPoint();
         targetPoint = newTargetPoint;
         AddNewTargetPoint();
-        CreateAllMarkers();
-        GenerateAndVisualizeFlowField();
-        isUpdating = false;
+        CreateStartAndTargetMarkers();
     }
 
     void RemoveOldStartPoint()
@@ -403,6 +457,24 @@ public class MapGeneration : MonoBehaviour
         }
     }
 
+    public void SetTargetPointStrength(float strength)
+    {
+        for (int i = 0; i < influencePoints.Count; i++)
+        {
+            FlowUtility.InfluencePoint point = influencePoints[i];
+            if (point.IsAttraction)
+            {
+                influencePoints[i] = new FlowUtility.InfluencePoint(
+                    point.Position,
+                    strength,
+                    true
+                );
+                Debug.Log($"Updated target point strength to {strength}");
+                return;
+            }
+        }
+    }
+
     void GenerateAndVisualizeFlowField()
     {
         if (isUpdating) return;
@@ -431,14 +503,12 @@ public class MapGeneration : MonoBehaviour
                 Vector2 flowVector = flowField[x, y];
 
                 GameObject arrow;
-                
-                // Reuse existing arrow if it exists
+
                 if (arrowMap.ContainsKey(arrowKey))
                 {
                     arrow = arrowMap[arrowKey];
                     if (arrow == null)
                     {
-                        // Arrow was destroyed, create new one
                         arrow = Instantiate(
                             arrowPrefab,
                             cellPosition + Vector3.up * 0.1f,
@@ -451,7 +521,6 @@ public class MapGeneration : MonoBehaviour
                 }
                 else
                 {
-                    // Create new arrow on first run
                     arrow = Instantiate(
                         arrowPrefab,
                         cellPosition + Vector3.up * 0.1f,
@@ -462,7 +531,6 @@ public class MapGeneration : MonoBehaviour
                     flowFieldArrows.Add(arrow);
                 }
 
-                // UPDATE existing arrow data instead of recreating
                 arrow.transform.position = cellPosition + Vector3.up * 0.1f;
                 arrow.transform.rotation = Quaternion.LookRotation(
                     new Vector3(flowVector.x, 0, flowVector.y)
@@ -490,10 +558,16 @@ public class MapGeneration : MonoBehaviour
         GenerateAndVisualizeFlowField();
     }
 
+    public void RegenerateFlowField()
+    {
+        if (isUpdating) return;
+        GenerateAndVisualizeFlowField();
+    }
+
     void OnDestroy()
     {
         DestroyStartAndTargetMarkers();
-        
+
         foreach (GameObject marker in influencePointMarkers)
         {
             if (marker != null)
