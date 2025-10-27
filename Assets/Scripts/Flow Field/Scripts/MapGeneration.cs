@@ -28,7 +28,7 @@ public class MapGeneration : MonoBehaviour
     private HashSet<Vector2> influencePointPositions = new HashSet<Vector2>();
     private GameObject startPointMarkerInstance;
     private GameObject targetPointMarkerInstance;
-    private Vector2[,] flowField;
+    public static Vector2[,] flowField;
 
     private bool isUpdating = false;
 
