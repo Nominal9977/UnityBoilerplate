@@ -1,6 +1,7 @@
+using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Collections.Generic;
 
 public class FlowFieldGUI : MonoBehaviour
 {
@@ -192,11 +193,12 @@ public class FlowFieldGUI : MonoBehaviour
         {
             return;
         }
-
         GameObject listItem = Instantiate(influenceListItemPrefab, influenceListContent);
         influenceListItems.Add(listItem);
 
-        Text itemText = listItem.GetComponentInChildren<Text>();
+        // FIND TEXTMESHPRO (not legacy Text)
+        TextMeshProUGUI itemText = listItem.GetComponentInChildren<TextMeshProUGUI>();
+
         if (itemText != null)
         {
             string typeText;
@@ -222,15 +224,33 @@ public class FlowFieldGUI : MonoBehaviour
             itemText.text = $"({point.Position.x:F1}, {point.Position.y:F1}) | Strength: {point.Strength:F1} | {typeText}";
         }
 
+        // Find the delete button
         Button deleteButton = listItem.GetComponentInChildren<Button>();
         if (deleteButton != null)
         {
-            var pointCopy = point;
-            deleteButton.onClick.AddListener(() => RemoveInfluencePoint(pointCopy));
-            Text deleteButtonText = deleteButton.GetComponentInChildren<Text>();
-            if (deleteButtonText != null)
+            // Check if this is a start or target point
+            bool isStartPoint = !point.IsAttraction && Vector2.Distance(point.Position, mapGeneration.startPoint) < 0.1f;
+            bool isTargetPoint = point.IsAttraction && Vector2.Distance(point.Position, mapGeneration.targetPoint) < 0.1f;
+
+            // Hide button for start/target points
+            if (isStartPoint || isTargetPoint)
             {
-                deleteButtonText.text = "X";
+                deleteButton.gameObject.SetActive(false);
+                Debug.Log($"Hiding delete button for {(isStartPoint ? "START" : "TARGET")} point");
+            }
+            else
+            {
+                // Show button for custom repulsion points
+                deleteButton.gameObject.SetActive(true);
+
+                var pointCopy = point;
+                deleteButton.onClick.AddListener(() => RemoveInfluencePoint(pointCopy));
+
+                Text deleteButtonText = deleteButton.GetComponentInChildren<Text>();
+                if (deleteButtonText != null)
+                {
+                    deleteButtonText.text = "X";
+                }
             }
         }
 
