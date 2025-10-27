@@ -25,7 +25,7 @@ public class MapGeneration : MonoBehaviour
     public List<FlowUtility.InfluencePoint> influencePoints = new List<FlowUtility.InfluencePoint>();
     private List<GameObject> influencePointMarkers = new List<GameObject>();
     private Dictionary<Vector2, GameObject> influenceMarkerMap = new Dictionary<Vector2, GameObject>();
-    private HashSet<Vector2> influencePointPositions = new HashSet<Vector2>();
+    public static HashSet<Vector2> influencePointPositions = new HashSet<Vector2>();
     private GameObject startPointMarkerInstance;
     private GameObject targetPointMarkerInstance;
     public static Vector2[,] flowField;
@@ -351,7 +351,7 @@ public class MapGeneration : MonoBehaviour
         return new List<FlowUtility.InfluencePoint>(influencePoints);
     }
 
-    public bool IsPositionBlocked(Vector2 position)
+    public static bool IsPositionBlocked(Vector2 position)
     {
         return influencePointPositions.Contains(position);
     }

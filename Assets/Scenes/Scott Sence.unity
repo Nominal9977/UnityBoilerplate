@@ -1923,8 +1923,8 @@ MonoBehaviour:
   regenerateButton: {fileID: 1032362327}
   clearAllInfluenceButton: {fileID: 0}
   influenceScrollRect: {fileID: 643172088}
-  influenceListContent: {fileID: 643172087}
-  influenceListItemPrefab: {fileID: 0}
+  influenceListContent: {fileID: 53855196}
+  influenceListItemPrefab: {fileID: 5636634300443149698, guid: 5ad0af57979512948bfbab1636e22eac, type: 3}
   statusText: {fileID: 0}
 --- !u!1 &895985242
 GameObject:
