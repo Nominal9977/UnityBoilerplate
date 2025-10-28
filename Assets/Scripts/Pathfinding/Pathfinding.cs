@@ -17,7 +17,11 @@ public class Pathfinding : MonoBehaviour
 {
     
     private List<Node> frontier = new List<Node>();
-    private HashSet<Node> cameFrom = new HashSet<Node>();
+    
+    private HashSet<Node> frontierSet = new HashSet<Node>();
+    private HashSet<Vector3> cameFrom = new HashSet<Vector3>();
+    
+    private List<Node> debugPath = null;
     
     private Dictionary<Vector3, Node> world = new Dictionary<Vector3, Node>();
     
@@ -36,26 +40,18 @@ public class Pathfinding : MonoBehaviour
         Vector2 goal2D = new Vector2(n2.position.x, n2.position.z);
         Vector2 directionToGoal = (goal2D - pos2D).normalized;
 
-        // Get array dimensions
         int width = MapGeneration.flowField.GetLength(0);
         int height = MapGeneration.flowField.GetLength(1);
     
-        // Clamp positions to valid range
         int x = Mathf.Clamp((int)pos2D.x, 0, width - 1);
         int y = Mathf.Clamp((int)pos2D.y, 0, height - 1);
     
-        // Get flow vector at this point
         var flowVector = MapGeneration.flowField[x, y];
-
-        // Calculate flow alignment
         float flowAlignment = Vector2.Dot(directionToGoal, flowVector);
-
         float distance = Vector2.Distance(pos2D, goal2D);
 
-        // Apply flow bonus/penalty to heuristic
-        float heuristic = distance * (1f - (flowAlignment * 0.3f));
-
-        return (int)heuristic;
+        float heuristic = distance * (1f - (flowAlignment * 0.5f));
+        return Mathf.RoundToInt(heuristic * 10);
     }
 
     private List<Node> ReconstructPath(Node n1)
@@ -83,9 +79,26 @@ public class Pathfinding : MonoBehaviour
     }
 
     //Get the cost of a Node
-    private int GetCost(Node n1, Node n2)
+    private int GetCost(Node from, Node to)
     {
-        return (int)Vector3.Distance(n1.position, n2.position);
+        float baseDistance = Vector3.Distance(from.position, to.position);
+    
+        Vector2 fromPos = new Vector2(from.position.x, from.position.z);
+        Vector2 toPos = new Vector2(to.position.x, to.position.z);
+        Vector2 moveDirection = (toPos - fromPos).normalized;
+    
+        int width = MapGeneration.flowField.GetLength(0);
+        int height = MapGeneration.flowField.GetLength(1);
+        int x = Mathf.Clamp((int)fromPos.x, 0, width - 1);
+        int y = Mathf.Clamp((int)fromPos.y, 0, height - 1);
+    
+        Vector2 flowVector = MapGeneration.flowField[x, y];
+        float flowAlignment = Vector2.Dot(moveDirection, flowVector);
+    
+        // More moderate multiplier (1.5x penalty, 0.7x bonus)
+        float flowMultiplier = Mathf.Lerp(1.5f, 0.7f, (flowAlignment + 1f) / 2f);
+    
+        return Mathf.RoundToInt(baseDistance * flowMultiplier * 10);
     }
 
     private bool IsValid(Vector3 pos)
@@ -158,38 +171,41 @@ public class Pathfinding : MonoBehaviour
         {
             Node current = GetLowestFCost();
             iterations++;
-
-            if (iterations % 100 == 0)
-            {
-                Debug.Log($"A* Iteration {iterations}, Frontier size: {frontier.Count}");
-            }
+            
 
             if (current.position == goal.position)
             {
                 Debug.Log($"Goal found after {iterations} iterations!");
                 List<Node> path = ReconstructPath(current);
                 onComplete?.Invoke(path);
+                OnDrawGizmos(); //Debug visualy with gizmos
                 yield break;
             }
             
-            cameFrom.Add(current);
+            cameFrom.Add(current.position);
 
             foreach (Node neighbor in GetNeighbours(current))
             {
                 //Check if visited already
-                if (cameFrom.Contains(neighbor))
+                if (cameFrom.Contains(neighbor.position))
                     continue;
+                
+                if (iterations < 5)
+                {
+                    DebugFlowFieldInfluence(current, neighbor);
+                }
     
                 int tentativeG = current.g + GetCost(current, neighbor);
 
                 // If neighbor is not in frontier, add it
-                if (!frontier.Contains(neighbor))
+                if (!frontierSet.Contains(neighbor))
                 {
                     neighbor.g = tentativeG;
                     neighbor.h = Heuristic(neighbor, goal, influencePoints);
                     neighbor.f = neighbor.g + neighbor.h;
                     neighbor.parent = current;
                     frontier.Add(neighbor);
+                    frontierSet.Add(neighbor);
                 }
                 // If we found a better path to this neighbor, update it
                 else if (tentativeG < neighbor.g)
@@ -258,6 +274,7 @@ public class Pathfinding : MonoBehaviour
         StartPathfinding(startNode, goalNode, mapGen.influencePoints, (path) => {            
             if (path != null)
             {
+                debugPath = path;
                 Debug.Log("===== PATH FOUND =====");
                 Debug.Log("Total nodes in path: " + path.Count);
                 Debug.Log("===== PATH NODES =====");
@@ -274,6 +291,54 @@ public class Pathfinding : MonoBehaviour
                 Debug.Log("No path found");
             }
         });
+    }
+    
+    private void OnDrawGizmos()
+    {
+        // Draw explored nodes in gray
+        Gizmos.color = new Color(0.5f, 0.5f, 0.5f, 0.3f);
+        foreach (Vector3 pos in cameFrom)
+        {
+            Gizmos.DrawCube(pos, Vector3.one * 0.8f);
+        }
+
+        // Draw path in bright green (drawn after so it's on top)
+        if (debugPath != null && debugPath.Count > 0)
+        {
+            Gizmos.color = Color.green;
+            for (int i = 0; i < debugPath.Count - 1; i++)
+            {
+                Gizmos.DrawLine(debugPath[i].position + Vector3.up * 0.5f, 
+                    debugPath[i + 1].position + Vector3.up * 0.5f);
+            }
+        }
+    }
+    
+    private void DebugFlowFieldInfluence(Node from, Node to)
+    {
+        Vector2 fromPos = new Vector2(from.position.x, from.position.z);
+        Vector2 toPos = new Vector2(to.position.x, to.position.z);
+        Vector2 moveDirection = (toPos - fromPos).normalized;
+
+        int width = MapGeneration.flowField.GetLength(0);
+        int height = MapGeneration.flowField.GetLength(1);
+        int x = Mathf.Clamp((int)fromPos.x, 0, width - 1);
+        int y = Mathf.Clamp((int)fromPos.y, 0, height - 1);
+
+        Vector2 flowVector = MapGeneration.flowField[x, y];
+        
+        float magnitude = flowVector.magnitude;
+
+        
+        float flowAlignment = Vector2.Dot(moveDirection, flowVector);
+        float flowMultiplier = Mathf.Lerp(1.5f, 0.7f, (flowAlignment + 1f) / 2f);
+
+        Debug.Log($"Move from {from.position} to {to.position}:");
+        Debug.Log($"  Move direction: {moveDirection}");
+        Debug.Log($"  Flow vector at [{x},{y}]: {flowVector}");
+        Debug.Log($"  Flow magnitude: {magnitude} ⚠️ SHOULD BE ~1.0"); // ADD THIS
+        Debug.Log($"  Flow alignment: {flowAlignment:F2} (-1=against, 1=with)");
+        Debug.Log($"  Cost multiplier: {flowMultiplier:F2}x");
     }
     
 }
