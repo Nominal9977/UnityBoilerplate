@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Runtime.InteropServices.WindowsRuntime;
 using UnityEngine;
 
 public class MapGeneration : MonoBehaviour
@@ -17,6 +18,10 @@ public class MapGeneration : MonoBehaviour
 
     public Vector2 startPoint = new Vector2(0, 0);
     public Vector2 targetPoint = new Vector2(9, 9);
+
+    public static Vector2 startPointStatic = new Vector2(0, 0);
+    public static Vector2 TargetPointStatic = new Vector2(0, 0);
+
 
     private List<GameObject> mapCells = new List<GameObject>();
     private List<GameObject> flowFieldArrows = new List<GameObject>();
@@ -325,6 +330,7 @@ public class MapGeneration : MonoBehaviour
         if (isUpdating) return;
         RemoveOldStartPoint();
         startPoint = newStartPoint;
+        startPointStatic = newStartPoint; 
         AddNewStartPoint();
         CreateStartAndTargetMarkers();
     }
@@ -334,6 +340,7 @@ public class MapGeneration : MonoBehaviour
         if (isUpdating) return;
         RemoveOldTargetPoint();
         targetPoint = newTargetPoint;
+        TargetPointStatic = newTargetPoint;  
         AddNewTargetPoint();
         CreateStartAndTargetMarkers();
     }
@@ -407,9 +414,12 @@ public class MapGeneration : MonoBehaviour
 
     public static bool IsPositionBlocked(Vector2 position)
     {
+        if (position == startPointStatic || position == TargetPointStatic)
+        {
+            return false;
+        }
         return influencePointPositions.Contains(position);
     }
-
     public bool IsPositionBlockedWithinRadius(Vector2 position, float radius = 0.5f)
     {
         foreach (var influencePos in influencePointPositions)
