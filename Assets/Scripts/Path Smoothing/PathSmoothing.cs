@@ -1,11 +1,13 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 public class Smoother
 {
     // Constructor With Offset Point
-    public Smoother(MapGeneration map_gen, Vector3 start_point, Vector3 offset_point, Vector3 end_point) {
+    public Smoother(MapGeneration map_gen, Vector3 start_point, Vector3 offset_point, Vector3 end_point, PathSmoothing path_smoothing) {
         this.start_point = new Vector3(
             start_point.x * (map_gen.cellPadding + map_gen.cellSize),
             0,
@@ -22,10 +24,12 @@ public class Smoother
             end_point.z * (map_gen.cellPadding + map_gen.cellSize)
         );
         has_offset_point = true;
+        pathsmoothing = path_smoothing;
+        pathsmoothing.SpawnPoints(this.start_point, this.offset_point, this.end_point);
     }
 
     // Constructor Without Offset Point
-    public Smoother(MapGeneration map_gen, Vector3 start_point, Vector3 end_point) {
+    public Smoother(MapGeneration map_gen, Vector3 start_point, Vector3 end_point, PathSmoothing path_smoothing) {
         this.start_point = new Vector3(
             start_point.x * (map_gen.cellPadding + map_gen.cellSize),
             0,
@@ -37,6 +41,8 @@ public class Smoother
             end_point.z * (map_gen.cellPadding + map_gen.cellSize)
         );
         has_offset_point = false;
+        pathsmoothing = path_smoothing;
+        pathsmoothing.SpawnPoints(this.start_point, this.end_point);
     }
 
     // Constuctor Defined Variables
@@ -48,6 +54,8 @@ public class Smoother
     public float current_time = 0.0f;
     public Vector3 current_position;
     public string type = "";
+
+    public PathSmoothing pathsmoothing;
 
     bool has_offset_point = false;
     public bool finished = false;
@@ -96,191 +104,263 @@ public class PathSmoothing : MonoBehaviour
 {
     List<Node> node_list = new List<Node>();
     List<Smoother> final_path = new List<Smoother>();
+    List<GameObject> start_points = new List<GameObject>();
+    List<GameObject> bezier_points = new List<GameObject>();
+    List<GameObject> end_points = new List<GameObject>();
 
     int smoother_index = 0;
-    int last_exit = (int)Directions.South;
+    int last_exit_enum = (int)Directions.South;
+    int creating_smoother_index = 0;
 
     [SerializeField] MapGeneration map_gen;
+    [SerializeField] GameObject point_prefab;
+    [SerializeField] GameObject bezier_point_prefab;
     public void SetPath(List<Node> path) {
         // Update Path
         this.node_list = path;
 
-        // first node in list will have start point (duh)
-        // loop through and setup logic per unit, based on a start enxit and potional offset for bezier curves
-        // used scotts hashmap to check for wall blocks which will form diagonals
-
-
-        // variables
-        // last "exit" state (current moving direction):
-        // - normal (any of 4 cardinal directions)
-        // - diagonal (any of 4 sub-cardinal directions)
-
-        // frame checks
-        // if exit normal
-
-        List<int> exit_directions = new List<int>(node_list.Count);
-        exit_directions.Add(last_exit);
-
         // Calculate Direction For Each Point In Path
         for (int i = 0; i < node_list.Count - 2; i++) {
+            // Get Next 3 Postitions
             Vector3 current_node_position = node_list[i].position;
             Vector3 next_node_position = node_list[i+1].position;
             Vector3 far_node_position = node_list[i+2].position;
 
+            // Get Distance Between These Next Postiions
             Vector3 difference_a = next_node_position - current_node_position;
             Vector3 difference_b = far_node_position - next_node_position;
 
-            // Check If Starting Diagonal, Otherwise Turn Normally
-            int exit_direction_a = DifferenceToNormalDirectionEnum(difference_a);
-            int exit_direction_b = DifferenceToNormalDirectionEnum(difference_b);
+            // Get Node Exit Directions 
+            int exit_direction_a_enum = DifferenceToNormalDirectionEnum(difference_a);
+            int exit_direction_b_enum = DifferenceToNormalDirectionEnum(difference_b);
+            Vector3 exit_direction_a = DirectionEnumToDirection(exit_direction_a_enum);
+            Vector3 exit_direction_b = DirectionEnumToDirection(exit_direction_b_enum);
 
-            if (last_exit <= (int)Directions.East) // Normal Direction
+            // Get Current Entry Direction Enum & Direction Vector
+            int entry_direction_enum = DirectionEnumToOppositeDirectionEnum(last_exit_enum);
+            Vector3 entry_direction = DirectionEnumToDirection(entry_direction_enum);
+
+            Debug.Log("CALCULATING (" + creating_smoother_index + ") " + DirectionEnumToString(entry_direction_enum) + " ENTRY\nFUTURE EXITS: " + DirectionEnumToString(exit_direction_a_enum) + " ... " + DirectionEnumToString(exit_direction_b_enum));
+
+            // If Entering From Normal Direction (Not Diagonal)
+            if (last_exit_enum <= (int)Directions.East)
             {
-                if(difference_a == difference_b)
+                // Check If Starting A Diagonal, Otherwise Turn Normally
+                bool went_diagonal = false;
+
+                // Get Node (Index Space Index) Ahead Of Entry
+                Vector2 entry_ahead_index = new Vector2(current_node_position.x + entry_direction.x, current_node_position.z + entry_direction.z);
+                
+                // Use This To Determine If A Wall Exists There
+                if (!MapGeneration.IsPositionBlocked(entry_ahead_index))
                 {
-                    // Check If Continue Straight
-                    int opposite_last_exit = DirectionEnumToOppositeDirectionEnum(last_exit);
-                    Smoother next_path = new Smoother(map_gen, current_node_position - DirectionEnumToDirection(opposite_last_exit)/2, next_node_position - difference_a/2);
-                    final_path.Add(next_path);
-                    next_path.type = "Normal Straight";
-                } else 
-                {
-                    // Check If Starting A Diagonal, Otherwise Turn Normally
-                    bool went_diagonal = false;
-
-                    // We Know We Are Turning, So We Check If We Are Staying Oriented
-                    if(exit_direction_b == last_exit)
+                    // Check Two Different Scenarios In Which Diagonal Movement Is Started
+                    if (exit_direction_b_enum == last_exit_enum && exit_direction_a_enum == NormalDirectionEnumTo90ClockwiseEnum(entry_direction_enum))
                     {
-                        // Check If Opposite To Exit Is A "Wall"
-                        int opposite_last_exit = DirectionEnumToOppositeDirectionEnum((int)last_exit);
-                        Vector3 opposite_last_exit_direction = DirectionEnumToDirection(opposite_last_exit);
-                        Vector2 oppposite_last_exit_index = new Vector2(current_node_position.x + opposite_last_exit_direction.x, current_node_position.z + opposite_last_exit_direction.z);
-                        
-                        bool wall_exists = MapGeneration.IsPositionBlocked(oppposite_last_exit_index);
+                        // Get Start, Offset (Bezier), & End Points
+                        Vector3 start_point = current_node_position + entry_direction / 2;
+                        Vector3 offset_point = current_node_position - (entry_direction / 5);
+                        Vector3 end_point = current_node_position + (difference_a / 2) - (entry_direction / 2);
 
-                        if(!wall_exists)
-                        {
-                            Vector3 start_point = current_node_position - DirectionEnumToDirection(opposite_last_exit)/2;
-                            Vector3 offset_point = current_node_position - (difference_a / 4) + (opposite_last_exit_direction / 4);
-                            Vector3 end_point = current_node_position + (difference_a / 2) + (opposite_last_exit_direction / 2);
-                            Smoother next_path = new Smoother(map_gen, start_point, offset_point, end_point);
-                            next_path.type = "Starting Diagonal (Type A)";
-                            final_path.Add(next_path);
-                            went_diagonal = true;
-                            i += 1;
-                            last_exit = NormalDirectionEnumTo45CounterClockwiseEnum(last_exit, "Start Diagonal");
-                        }
-                    } else if(NormalDirectionEnumTo90CounterClockwiseEnum(exit_direction_b) == last_exit)
-                    {
-                        // Check If Opposite To Exit Is A "Wall"
-                        int opposite_last_exit = DirectionEnumToOppositeDirectionEnum(exit_direction_b);
-                        Vector3 opposite_last_exit_direction = DirectionEnumToDirection(opposite_last_exit);
-                        Vector2 oppposite_last_exit_index = new Vector2(current_node_position.x + opposite_last_exit_direction.x, current_node_position.z + opposite_last_exit_direction.z);
+                        // Create Smoother
+                        Smoother next_path = new Smoother(map_gen, start_point, offset_point, end_point, this);
+                        next_path.type = "Starting Diagonal (Type A)";
 
-                        bool wall_exists = MapGeneration.IsPositionBlocked(oppposite_last_exit_index);
-
-                        if (!wall_exists)
-                        {
-                            Vector3 start_point = current_node_position - DirectionEnumToDirection(opposite_last_exit) / 2;
-                            Vector3 offset_point = current_node_position - (difference_a / 4) + (opposite_last_exit_direction / 4);
-                            Vector3 end_point = current_node_position + (difference_a / 2) + (opposite_last_exit_direction / 2);
-                            Smoother next_path = new Smoother(map_gen, start_point, offset_point, end_point);
-                            next_path.type = "Starting Diagonal (Type B)";
-                            final_path.Add(next_path);
-                            went_diagonal = true;
-                            i += 1;
-                            last_exit = NormalDirectionEnumTo45ClockwiseEnum(last_exit);
-                        }
-                    }
-
-                    // No Other Option Besides Normal Turn
-                    if(went_diagonal == false)
-                    {
-                        int opposite_last_exit = DirectionEnumToOppositeDirectionEnum((int)last_exit);
-                        Vector3 start_point = current_node_position - DirectionEnumToDirection(opposite_last_exit)/2;
-                        Vector3 end_point = current_node_position + (difference_a / 2);
-                        Smoother next_path = new Smoother(map_gen, start_point, current_node_position, end_point);
-                        next_path.type = "Turning";
+                        // Add To Final Path
                         final_path.Add(next_path);
-                        last_exit = exit_direction_a;
+
+                        // Say That We Did Go Diagonal For Future Code
+                        went_diagonal = true;
+
+                        // Index By 1 More Since We Will Be "Skipping" Next Node
+                        i += 1;
+
+                        // Update Last Exit Since It Changed
+                        last_exit_enum = NormalDirectionEnumTo45CounterClockwiseEnum(last_exit_enum, "Start Diagonal");
+
+                        // Print Result
+                        Debug.Log("--> RESULT - START DIAGONAL A | EXIT " + DirectionEnumToString(last_exit_enum));
+
+                    }
+                    else if (NormalDirectionEnumTo90CounterClockwiseEnum(exit_direction_b_enum) == last_exit_enum && exit_direction_a_enum == last_exit_enum)
+                    {
+                        // Get Start, Offset (Bezier), & Exit Points
+                        Vector3 start_point = current_node_position + entry_direction / 2;
+                        Vector3 offset_point = current_node_position + (difference_a / 5);
+                        Vector3 end_point = current_node_position - (entry_direction / 2) + (exit_direction_b / 2);
+
+                        // Create Smoother
+                        Smoother next_path = new Smoother(map_gen, start_point, offset_point, end_point, this);
+                        next_path.type = "Starting Diagonal (Type B)";
+
+                        // Add To Final Path
+                        final_path.Add(next_path);
+
+                        // Say That We Did Go Diagonal For Future Code
+                        went_diagonal = true;
+
+                        // Increment Index Since We Will Be "Skipping" Next Node
+                        i += 1;
+
+                        // Update Last Exit Since It Changed
+                        last_exit_enum = NormalDirectionEnumTo45ClockwiseEnum(last_exit_enum);
+
+                        // Print Result
+                        Debug.Log("--> RESULT - START DIAGONAL B | EXIT " + DirectionEnumToString(last_exit_enum));
                     }
                 }
 
-                // cases
-                // -Keep going straight
-                // -turn left or right
-                // -shift to diagonal left or right
-            } else // Diagonal Direction
+                // If Didn't Start Diagonal
+                if (went_diagonal == false)
+                {
+                    // Check If We Are Going Straight, Otherwise Turn
+                    if (exit_direction_a_enum == DirectionEnumToOppositeDirectionEnum(entry_direction_enum))
+                    {
+                        // Get Start & End Points
+                        Vector3 start_point = current_node_position + DirectionEnumToDirection(entry_direction_enum) / 2;
+                        Vector3 end_point = next_node_position - difference_a / 2;
+
+                        // Create Smoother
+                        Smoother next_path = new Smoother(map_gen, start_point, end_point, this);
+                        next_path.type = "Normal Straight";
+
+                        // Add To Final Path
+                        final_path.Add(next_path);
+
+                        // Print Result
+                        Debug.Log("--> RESULT - STRAIGHT | EXIT " + DirectionEnumToString(last_exit_enum));
+                    }
+                    else
+                    {
+                        // Get Start & End Points (Offset (Bezier) Is Nodes Center)
+                        Vector3 start_point = current_node_position + entry_direction /2;
+                        Vector3 end_point = current_node_position + (difference_a / 2);
+
+                        // Create Smoother
+                        Smoother next_path = new Smoother(map_gen, start_point, current_node_position, end_point, this);
+                        next_path.type = "Turning";
+
+                        // Add To Final Path
+                        final_path.Add(next_path);
+
+                        // Update Last Exit Since It Change
+                        last_exit_enum = exit_direction_a_enum;
+
+                        // Print Result
+                        print("--> RESULT - TURNING | EXIT " + DirectionEnumToString(last_exit_enum));
+                    }
+                }
+            } 
+            else // Starting Diagonal Direction
             {
-                int left_direction = NormalDirectionEnumTo45CounterClockwiseEnum(last_exit, "Continue Diagonal");
-                int right_direction = NormalDirectionEnumTo45ClockwiseEnum(last_exit);
+                int left_direction = NormalDirectionEnumTo45CounterClockwiseEnum(last_exit_enum, "Continue Diagonal");
+                int right_direction = NormalDirectionEnumTo45ClockwiseEnum(last_exit_enum);
                 bool staying_diagonal = false;
 
-                if (exit_direction_a == left_direction)
+                // Get Node (Index Space Index) Ahead Of Entry
+                Vector2 entry_ahead_index = new Vector2(current_node_position.x + entry_direction.x, current_node_position.z + entry_direction.z);
+                
+                // Use This To Determine If A Wall Exists There
+                if (!MapGeneration.IsPositionBlocked(entry_ahead_index))
                 {
-                    if(exit_direction_b == right_direction)
+                    // Check Two Different Scenarios In Which Diagonal Movement Is Ended
+                    if (exit_direction_a_enum == left_direction && exit_direction_b_enum == right_direction)
                     {
-                        // Check If Opposite To Exit Is A "Wall"
-                        int opposite_last_exit = DirectionEnumToOppositeDirectionEnum((int)last_exit);
-                        Vector3 exit_b_direction = DirectionEnumToDirection(exit_direction_b);
-                        Vector3 opposite_last_exit_direction = DirectionEnumToDirection(opposite_last_exit);
-                        Vector2 oppposite_last_exit_index = new Vector2(current_node_position.x + exit_b_direction.x, current_node_position.z + exit_b_direction.z);
+                        // Calculate Start & End Points
+                        Vector3 start_point = current_node_position + entry_direction / 2;
+                        Vector3 end_point = current_node_position - (entry_direction / 2);
 
-                        bool wall_exists = MapGeneration.IsPositionBlocked(oppposite_last_exit_index);
+                        // Create Smoother
+                        Smoother next_path = new Smoother(map_gen, start_point, end_point, this);
+                        next_path.type = "Continue Diagonal A";
 
-                        if (!wall_exists)
-                        {
-                            Vector3 start_point = current_node_position - DirectionEnumToDirection(opposite_last_exit) / 2;
-                            Vector3 end_point = current_node_position + (difference_a / 2) + (opposite_last_exit_direction / 2);
-                            Smoother next_path = new Smoother(map_gen, start_point, end_point);
-                            next_path.type = "Continue Diagonal A";
-                            final_path.Add(next_path);
-                            staying_diagonal = true;
-                            i += 1;
-                        }
+                        // Add to Final Path
+                        final_path.Add(next_path);
+
+                        // Say That We Ended Up Staying Diagonal For Future Code
+                        staying_diagonal = true;
+
+                        // Increment Index Since We Will Be "Skipping" Next Node
+                        i += 1;
+                    }
+                    else if (exit_direction_a_enum == right_direction && exit_direction_b_enum == left_direction)
+                    {
+                        // Create Start And End Points
+                        Vector3 start_point = current_node_position + entry_direction / 2;
+                        Vector3 end_point = current_node_position - (entry_direction / 2);
+
+                        // Create Smoother
+                        Smoother next_path = new Smoother(map_gen, start_point, end_point, this);
+                        next_path.type = "Continue Diagonal B";
+
+                        // Add To Final Path
+                        final_path.Add(next_path);
+
+                        // Say That We Ended Up Staying Diagonal For Future Code
+                        staying_diagonal = true;
+
+                        // Increment Index Since We Will Be "Skipping" Next Node
+                        i += 1;
                     }
                 }
 
-
-                if (exit_direction_a == right_direction)
-                {
-                    if (exit_direction_b == left_direction)
-                    {
-                        // Check If Opposite To Exit Is A "Wall"
-                        int opposite_last_exit = DirectionEnumToOppositeDirectionEnum((int)last_exit);
-                        Vector3 exit_b_direction = DirectionEnumToDirection(exit_direction_b);
-                        Vector3 opposite_last_exit_direction = DirectionEnumToDirection(opposite_last_exit);
-                        Vector2 oppposite_last_exit_index = new Vector2(current_node_position.x + exit_b_direction.x, current_node_position.y + exit_b_direction.y);
-
-                        bool wall_exists = MapGeneration.IsPositionBlocked(oppposite_last_exit_index);
-
-                        if (!wall_exists)
-                        {
-                            Vector3 start_point = current_node_position - DirectionEnumToDirection(opposite_last_exit) / 2;
-                            Vector3 end_point = current_node_position + (difference_a / 2) + (opposite_last_exit_direction / 2);
-                            Smoother next_path = new Smoother(map_gen, start_point, end_point);
-                            next_path.type = "Continue Diagonal B";
-                            final_path.Add(next_path);
-                            staying_diagonal = true;
-                            i += 1;
-                        }
-                    }
-                }
-
+                // If We Are Falling Out Of Going Diagonal
                 if(staying_diagonal == false)
                 {
-                    Vector3 start_point = current_node_position - DirectionEnumToDirection(last_exit) / 2;
+                    // Set Start, Offset (Bezier), & End Points
+                    Vector3 start_point = current_node_position - DirectionEnumToDirection(last_exit_enum) / 2;
+                    Vector3 offset_point = current_node_position - (difference_a / 5); 
                     Vector3 end_point = next_node_position - difference_a / 2;
-                    Smoother next_path = new Smoother(map_gen, start_point, end_point);
+
+                    // Create Smoother
+                    Smoother next_path = new Smoother(map_gen, start_point, offset_point, end_point, this);
                     next_path.type = "End Diagonal";
+                    
+                    // Add To Final Path
                     final_path.Add(next_path);
-                    last_exit = exit_direction_a;
+
+                    // Update Last Exit
+                    last_exit_enum = exit_direction_a_enum;
+
+                    // Print Result
+                    print("--> RESULT - STOPPING DIAGONAL | EXIT " + DirectionEnumToString(last_exit_enum));
                 }
             }
+            creating_smoother_index++;
+
         }
 
-        
     }
+    
+    public void SpawnPoints(Vector3 position_start, Vector3 position_end)
+    {
+        GameObject start_point = Instantiate(point_prefab, position_start, Quaternion.identity);
+        start_point.name = "Start Point " + creating_smoother_index;
+        GameObject end_point = Instantiate(point_prefab, position_end, Quaternion.identity);
+        end_point.name = "End Point " + creating_smoother_index;
+
+        start_points.Add(start_point);
+        end_points.Add(end_point);
+    }
+
+    public void SpawnPoints(Vector3 position_start, Vector3 position_offset, Vector3 position_end)
+    {
+        GameObject start_point = Instantiate(point_prefab, position_start, Quaternion.identity);
+        start_point.name = "Start Point " + creating_smoother_index;
+        GameObject bezier_point = Instantiate(bezier_point_prefab, position_offset, Quaternion.identity);
+        bezier_point.name = "Bezier Point " + creating_smoother_index;
+        GameObject end_point = Instantiate(point_prefab, position_end, Quaternion.identity);
+        end_point.name = "End Point " + creating_smoother_index;
+
+        start_points.Add(start_point);
+        bezier_points.Add(bezier_point);
+        end_points.Add(end_point);
+    }
+
+    public void UpdateBezier(int index) {
+
+    }
+    
     public Vector3 DirectionEnumToDirection(int direction)
     {
         switch(direction)
@@ -339,6 +419,25 @@ public class PathSmoothing : MonoBehaviour
                 return (int)Directions.East;
             case (int)Directions.West:
                 return (int)Directions.South;
+            default:
+                Debug.LogError("SHOULD NEVER REACH - NormalDirectionEnumTo90CounterClockwiseEnum  - INPUT: " + direction);
+                break;
+        }
+        return (int)Directions.East;
+    }
+
+    public int NormalDirectionEnumTo90ClockwiseEnum(int direction)
+    {
+        switch (direction)
+        {
+            case (int)Directions.North:
+                return (int)Directions.East;
+            case (int)Directions.East:
+                return (int)Directions.South;
+            case (int)Directions.South:
+                return (int)Directions.West;
+            case (int)Directions.West:
+                return (int)Directions.North;
             default:
                 Debug.LogError("SHOULD NEVER REACH - NormalDirectionEnumTo90CounterClockwiseEnum  - INPUT: " + direction);
                 break;
@@ -424,6 +523,38 @@ public class PathSmoothing : MonoBehaviour
         return (int)Directions.North;
     }
 
+    public string DirectionEnumToString(int direction)
+    {
+        switch (direction)
+        {
+            case (int)Directions.North:
+                return "-NORTH-";
+            case (int)Directions.South:
+                return "-SOUTH-";
+            case (int)Directions.East:
+                return "-EAST-";
+            case (int)Directions.West:
+                return "-WEST-";
+            case (int)Directions.North_East:
+                return "-NORTH_EAST-";
+            case (int)Directions.North_West:
+                return "-NORTH_WEST-";
+            case (int)Directions.South_East:
+                return "-SOUTH_EAST-";
+            case (int)Directions.South_West:
+                return "-SOUTH_WEST-";
+            default:
+                return "DIRECTION NOT FOUND OH SHIT";
+        }
+    }
+
+    private void AddNewNode(Vector3 _position)
+    {
+        // Make Node, Set Position, & Add To Node List
+        Node new_node = new Node();
+        new_node.position = _position;
+        node_list.Add(new_node);
+    }
     // Start is called before the first frame update
     void Start()
     {
@@ -433,35 +564,48 @@ public class PathSmoothing : MonoBehaviour
         // Setup Direction List
         List<Vector3> directions = new List<Vector3>();
 
-        // Add Cardinal Directions
-        directions.Add(new Vector3(2, 0, 0));
-        directions.Add(new Vector3(-2, 0, 0));
-        directions.Add(new Vector3(0, 0, 2));
-        directions.Add(new Vector3(0, 0, -2));
+        // Add Sample Direction List
+        directions.Add(new Vector3(-1, 0, 0));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(-1, 0, 0));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(-1, 0, 0));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(-1, 0, 0));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(-1, 0, 0));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(-1, 0, 0));
+        directions.Add(new Vector3(-1, 0, 0));
+        directions.Add(new Vector3(-1, 0, 0));
+        directions.Add(new Vector3(-1, 0, 0));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(1, 0, 0));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(1, 0, 0));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(1, 0, 0));
+        directions.Add(new Vector3(0, 0, 1));
+        directions.Add(new Vector3(1, 0, 0));
 
-        Vector3 last_direction = new Vector3();
+
+        int last_direction = 0;
 
         // Generate A Random Amount Of Nodes
-        for (int i = 0; i < 100; i++)
-        { 
-            // Make Node, Set Position, & Add To Node List
-            Node new_node = new Node();
-            new_node.position = current_position;
-            node_list.Add(new_node);
-
-            // Pick A Random Of 4 Directions (x and z)
-            Vector3 next_direction = new Vector3(2, 0, 0);// directions[Random.Range(0, directions.Count)];
-            //while(next_direction == -last_direction)
-            //{
-              //  next_direction = directions[Random.Range(0, directions.Count)];
-            //}
-
-            // Add To New Position
-            current_position += next_direction;
+        for (int i = 0; i < directions.Count; i++)
+        {
+            current_position += directions[i];
+            AddNewNode(current_position);
         }
 
         // Set Path With Nodes
         SetPath(node_list);
+
+        // Print First Node Set
+        Smoother next = final_path[smoother_index];
+        print(next.type + " S: " + next.start_point + " E: " + next.end_point);
     }
 
     // Update is called once per frame
@@ -469,19 +613,18 @@ public class PathSmoothing : MonoBehaviour
     {
         if (final_path.Count == 0 || smoother_index >= final_path.Count)
         {
-            print("RETURNING UPDATE EARLY");
             return;
         }
-
+         
         // Get Current Smoother
         Smoother current_smoother = final_path[smoother_index];
 
-        current_smoother.Update(Time.deltaTime/1.5f);
+        current_smoother.Update(Time.deltaTime);
         if(current_smoother.finished)
         {
             smoother_index += 1;
             Smoother next = final_path[smoother_index];
-            print(next.type + "S: " + next.start_point + " E: " + next.end_point);
+            print(next.type + " S: " + next.start_point + " E: " + next.end_point);
         }
 
         transform.position = current_smoother.current_position;

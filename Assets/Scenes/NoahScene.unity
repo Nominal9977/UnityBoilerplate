@@ -293,14 +293,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1388308219}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalRotation: {x: 0.33008382, y: -0, z: -0, w: 0.94395167}
+  m_LocalPosition: {x: 0, y: 2.11, z: -1.48}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 0
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 38.548, y: 0, z: 0}
 --- !u!1 &2028916052
 GameObject:
   m_ObjectHideFlags: 0
@@ -355,7 +355,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 10303, guid: 0000000000000000f000000000000000, type: 0}
+  - {fileID: 2100000, guid: 30003889cbc6a5d42a24acfc69a49c9c, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -413,6 +413,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   map_gen: {fileID: 2074653841}
+  point_prefab: {fileID: 8893843936527512605, guid: 0d69eb1abce81c546a3e81b18bdbf760, type: 3}
+  bezier_point_prefab: {fileID: 7770202742591500188, guid: fbf7c18944b541444b2a48934d620d78, type: 3}
 --- !u!1 &2074653838
 GameObject:
   m_ObjectHideFlags: 0
@@ -445,6 +447,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   mapGeneration: {fileID: 2074653841}
+  mapWidthInput: {fileID: 0}
+  mapHeightInput: {fileID: 0}
+  updateMapButton: {fileID: 0}
   startXInput: {fileID: 0}
   startYInput: {fileID: 0}
   targetXInput: {fileID: 0}
@@ -455,6 +460,8 @@ MonoBehaviour:
   addInfluenceButton: {fileID: 0}
   regenerateButton: {fileID: 0}
   clearAllInfluenceButton: {fileID: 0}
+  randomizeButton: {fileID: 0}
+  autoRegenerateOnPointChange: 1
   influenceScrollRect: {fileID: 0}
   influenceListContent: {fileID: 0}
   influenceListItemPrefab: {fileID: 5636634300443149698, guid: 5ad0af57979512948bfbab1636e22eac, type: 3}
@@ -492,7 +499,7 @@ MonoBehaviour:
   startPointMarkerPrefab: {fileID: 7539365460956794899, guid: 041e6ed8f7827904695c1ba8795f84af, type: 3}
   targetPointMarkerPrefab: {fileID: 927773639204996189, guid: 4b65df0de778a04419a8c5de2a626b02, type: 3}
   repulsionPointMarkerPrefab: {fileID: 927773639204996189, guid: 53b711d6811241a41bf2d45e3c939371, type: 3}
-  startPoint: {x: 0, y: 0}
+  startPoint: {x: -16.03, y: -45.2}
   targetPoint: {x: 15, y: 9}
 --- !u!4 &2074653842
 Transform:
@@ -502,7 +509,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2074653838}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.15893596, y: 0, z: 0.15893596}
+  m_LocalPosition: {x: -22.52, y: 0, z: 0.15893596}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
