@@ -327,7 +327,6 @@ public class PathSmoothing : MonoBehaviour
                 }
             }
             creating_smoother_index++;
-
         }
 
     }
@@ -360,7 +359,8 @@ public class PathSmoothing : MonoBehaviour
     public void UpdateBezier(int index) {
 
     }
-    
+
+    #region Directional Functions
     public Vector3 DirectionEnumToDirection(int direction)
     {
         switch(direction)
@@ -547,6 +547,7 @@ public class PathSmoothing : MonoBehaviour
                 return "DIRECTION NOT FOUND OH SHIT";
         }
     }
+    #endregion
 
     private void AddNewNode(Vector3 _position)
     {
@@ -589,7 +590,6 @@ public class PathSmoothing : MonoBehaviour
         directions.Add(new Vector3(1, 0, 0));
         directions.Add(new Vector3(0, 0, 1));
         directions.Add(new Vector3(1, 0, 0));
-
 
         int last_direction = 0;
 
