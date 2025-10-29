@@ -26,6 +26,9 @@ public class Pathfinding : MonoBehaviour
     private Dictionary<Vector3, Node> world = new Dictionary<Vector3, Node>();
     
     [SerializeField] public MapGeneration mapGen;
+    
+    private float CellSpacing => mapGen.cellSize + mapGen.cellPadding;
+
 
     // Start is called before the first frame update
     void Start()
@@ -118,20 +121,34 @@ public class Pathfinding : MonoBehaviour
     {
         List<Node> neighbours = new List<Node>();
     
-        // Example for a grid-based system:
-        Vector3[] directions = {
-            Vector3.forward, Vector3.back, 
-            Vector3.left, Vector3.right
+        // First, figure out which grid cell this node is in
+        Vector2Int currentGrid = WorldToGridIndices(n.position);
+    
+        // Grid-based directions
+        Vector2Int[] gridDirections = {
+            Vector2Int.up,    // (0, 1)
+            Vector2Int.down,  // (0, -1)
+            Vector2Int.left,  // (-1, 0)
+            Vector2Int.right  // (1, 0)
         };
     
-        foreach (Vector3 dir in directions)
+        foreach (Vector2Int dir in gridDirections)
         {
-            Vector3 neighborPos = n.position + dir;
-            // Check if this position is valid and create/get the node
-            if (IsValid(neighborPos))
+            Vector2Int neighborGrid = currentGrid + dir;
+        
+            // Check bounds
+            if (neighborGrid.x >= 0 && neighborGrid.x < mapGen.mapWidth &&
+                neighborGrid.y >= 0 && neighborGrid.y < mapGen.mapHeight)
             {
-                Node neighbor = GetOrCreateNode(neighborPos);
-                neighbours.Add(neighbor);
+                // Convert grid position back to world position
+                Vector3 neighborWorldPos = GridToWorld(neighborGrid.x, neighborGrid.y);
+            
+                // Check if blocked (using grid coordinates now)
+                if (!MapGeneration.IsPositionBlocked(new Vector2(neighborGrid.x, neighborGrid.y)))
+                {
+                    Node neighbor = GetOrCreateNode(neighborWorldPos);
+                    neighbours.Add(neighbor);
+                }
             }
         }
     
@@ -228,22 +245,48 @@ public class Pathfinding : MonoBehaviour
         StartCoroutine(A_Star_Coroutine(start, goal, influencePoints, onComplete));
     }
     
+    
+    private Vector3 GridToWorld(int gx, int gy)
+    {
+        // MapGeneration.GridToWorldPosition returns same spacing; it doesn't include transform offset,
+        // so if your MapGeneration GameObject is moved, add mapGen.transform.position here:
+        return mapGen.GridToWorldPosition(gx, gy) + mapGen.transform.position;
+    }
+    
+    private Vector2Int WorldToGridIndices(Vector3 worldPos)
+    {
+        // Remove the transform offset to get local position
+        Vector3 localPos = worldPos - mapGen.transform.position;
+    
+        // Now calculate grid indices - add 0.5f to round properly
+        int gx = Mathf.RoundToInt(localPos.x / CellSpacing);
+        int gy = Mathf.RoundToInt(localPos.z / CellSpacing);
+    
+        // Clamp to grid bounds
+        gx = Mathf.Clamp(gx, 0, mapGen.mapWidth - 1);
+        gy = Mathf.Clamp(gy, 0, mapGen.mapHeight - 1);
+    
+        return new Vector2Int(gx, gy);
+    }
+    
     //Set the world grid
     private void SetWorldGrid()
     {
-        var flowField = MapGeneration.flowField;
+        world.Clear(); // Clear existing nodes
     
-        Debug.Log($"Loading {flowField.Length} positions from flowField");
         for (int x = 0; x < mapGen.mapWidth; x++)
         {
             for (int y = 0; y < mapGen.mapHeight; y++)
             {
-                Vector3 pos = new Vector3(x, 0, y);
-                var node = GetOrCreateNode(pos);
+                Vector3 worldPos = GridToWorld(x, y);
+                Node node = new Node();
+                node.position = worldPos;
+                world[worldPos] = node;
+            
+                Debug.Log($"Created node at grid[{x},{y}] -> world{worldPos}");
             }
         }
-        
-        Debug.Log($"Loaded {world.Count} nodes into world");
+        Debug.Log($"World grid initialized with {world.Count} nodes");
     }
     
     private IEnumerator WaitForFlowFieldAndInitialize()
@@ -265,8 +308,8 @@ public class Pathfinding : MonoBehaviour
             yield break;
         }
         
-        Node startNode = GetOrCreateNode(mapGen.startPoint);
-        Node goalNode = GetOrCreateNode(mapGen.targetPoint);
+        Node startNode = GetOrCreateNode(GridToWorld((int)mapGen.startPoint.x, (int)mapGen.startPoint.y));
+        Node goalNode  = GetOrCreateNode(GridToWorld((int)mapGen.targetPoint.x, (int)mapGen.targetPoint.y));
         
 
         Debug.Log($"Starting pathfind from {startNode.position} to {goalNode.position}");
@@ -312,6 +355,10 @@ public class Pathfinding : MonoBehaviour
                     debugPath[i + 1].position + Vector3.up * 0.5f);
             }
         }
+        
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireCube(new Vector3(mapGen.mapWidth / 2f, 0, mapGen.mapHeight / 2f),
+            new Vector3(mapGen.mapWidth, 0.1f, mapGen.mapHeight));
     }
     
     private void DebugFlowFieldInfluence(Node from, Node to)
