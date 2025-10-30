@@ -28,13 +28,6 @@ public class Pathfinding : MonoBehaviour
     [SerializeField] public MapGeneration mapGen;
     
     private float CellSpacing => mapGen.cellSize + mapGen.cellPadding;
-
-
-    // Start is called before the first frame update
-    void Start()
-    {
-        StartCoroutine(WaitForFlowFieldAndInitialize());
-    }
     
     
     private int Heuristic(Node n1, Node n2, List<FlowUtility.InfluencePoint> influencePoints)
@@ -455,5 +448,11 @@ public class Pathfinding : MonoBehaviour
                 Gizmos.DrawWireSphere(goalWorld, 0.5f);
             }
         }
+    }
+    
+    //Start the A* search
+    public void StartPathfinding()
+    {
+        StartCoroutine(WaitForFlowFieldAndInitialize());
     }
 }
