@@ -8,6 +8,8 @@ public class MapGeneration : MonoBehaviour
     public int mapHeight = 10;
     public float cellSize = 1f;
     public float cellPadding = 0.1f;
+    public float cellSizeNerf;
+    public float cellPaddingNerf;
     public GameObject cellPrefab;
     public GameObject arrowPrefab;
 
@@ -39,6 +41,10 @@ public class MapGeneration : MonoBehaviour
 
     void Start()
     {
+        float nerf = 1f;
+        cellPaddingNerf = cellPadding * nerf;
+        cellSizeNerf = cellSize * nerf;
+
         if (mapWidth <= 0 || mapHeight <= 0)
         {
             Debug.LogError("MapGeneration: Invalid map dimensions!");

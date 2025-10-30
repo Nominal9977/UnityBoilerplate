@@ -9,19 +9,19 @@ public class Smoother
     // Constructor With Offset Point
     public Smoother(MapGeneration map_gen, Vector3 start_point, Vector3 offset_point, Vector3 end_point, PathSmoothing path_smoothing) {
         this.start_point = new Vector3(
-            start_point.x * (map_gen.cellPadding + map_gen.cellSize),
+            start_point.x * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf),
             0,
-            start_point.z * (map_gen.cellPadding + map_gen.cellSize)
+            start_point.z * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf)
         );
         this.offset_point = new Vector3(
-            offset_point.x * (map_gen.cellPadding + map_gen.cellSize),
+            offset_point.x * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf),
             0,
-            offset_point.z * (map_gen.cellPadding + map_gen.cellSize)
+            offset_point.z * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf)
         );
         this.end_point = new Vector3(
-            end_point.x * (map_gen.cellPadding + map_gen.cellSize),
+            end_point.x * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf),
             0,
-            end_point.z * (map_gen.cellPadding + map_gen.cellSize)
+            end_point.z * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf)
         );
         has_offset_point = true;
         pathsmoothing = path_smoothing;
@@ -31,14 +31,14 @@ public class Smoother
     // Constructor Without Offset Point
     public Smoother(MapGeneration map_gen, Vector3 start_point, Vector3 end_point, PathSmoothing path_smoothing) {
         this.start_point = new Vector3(
-            start_point.x * (map_gen.cellPadding + map_gen.cellSize),
+            start_point.x * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf),
             0,
-            start_point.z * (map_gen.cellPadding + map_gen.cellSize)
+            start_point.z * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf)
         );
         this.end_point = new Vector3(
-            end_point.x * (map_gen.cellPadding + map_gen.cellSize),
+            end_point.x * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf),
             0,
-            end_point.z * (map_gen.cellPadding + map_gen.cellSize)
+            end_point.z * (map_gen.cellPaddingNerf + map_gen.cellSizeNerf)
         );
         has_offset_point = false;
         pathsmoothing = path_smoothing;
@@ -59,6 +59,7 @@ public class Smoother
 
     bool has_offset_point = false;
     public bool finished = false;
+    public bool loop = false;
 
     public void Update(float delta_time) {
         // Increment the current time by the delta time
@@ -111,6 +112,7 @@ public class PathSmoothing : MonoBehaviour
     int smoother_index = 0;
     int last_exit_enum = (int)Directions.South;
     int creating_smoother_index = 0;
+    bool loop = false;
 
     [SerializeField] MapGeneration map_gen;
     [SerializeField] GameObject point_prefab;
@@ -122,9 +124,9 @@ public class PathSmoothing : MonoBehaviour
         // Calculate Direction For Each Point In Path
         for (int i = 0; i < node_list.Count - 2; i++) {
             // Get Next 3 Postitions
-            Vector3 current_node_position = node_list[i].position;
-            Vector3 next_node_position = node_list[i+1].position;
-            Vector3 far_node_position = node_list[i+2].position;
+            Vector3 current_node_position = node_list[i].indexSpace;
+            Vector3 next_node_position = node_list[i+1].indexSpace;
+            Vector3 far_node_position = node_list[i+2].indexSpace;
 
             // Get Distance Between These Next Postiions
             Vector3 difference_a = next_node_position - current_node_position;
@@ -141,6 +143,7 @@ public class PathSmoothing : MonoBehaviour
             Vector3 entry_direction = DirectionEnumToDirection(entry_direction_enum);
 
             Debug.Log("CALCULATING (" + creating_smoother_index + ") " + DirectionEnumToString(entry_direction_enum) + " ENTRY\nFUTURE EXITS: " + DirectionEnumToString(exit_direction_a_enum) + " ... " + DirectionEnumToString(exit_direction_b_enum));
+            Debug.Log("NODE POSITION: " + current_node_position);
 
             // If Entering From Normal Direction (Not Diagonal)
             if (last_exit_enum <= (int)Directions.East)
@@ -328,6 +331,8 @@ public class PathSmoothing : MonoBehaviour
             }
             creating_smoother_index++;
         }
+        loop = true;
+
 
     }
     
@@ -559,6 +564,8 @@ public class PathSmoothing : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        //Returns early left for debug
+        return;
         // Setup Start Position
         Vector3 current_position = new Vector3();
         
@@ -611,6 +618,7 @@ public class PathSmoothing : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        if (!loop) return;
         if (final_path.Count == 0 || smoother_index >= final_path.Count)
         {
             return;

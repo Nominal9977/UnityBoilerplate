@@ -11,6 +11,7 @@ public class Node //Node class that each node will have
     public int f; //Total estimated cost
     public Node parent; //For reconstruction
     public Vector3 position;
+    public Vector3 indexSpace;
 }
 
 public class Pathfinding : MonoBehaviour
@@ -20,6 +21,7 @@ public class Pathfinding : MonoBehaviour
     
     private HashSet<Node> frontierSet = new HashSet<Node>();
     private HashSet<Vector3> cameFrom = new HashSet<Vector3>();
+    [SerializeField] PathSmoothing smothing;
     
     private List<Node> debugPath = null;
     
@@ -52,6 +54,7 @@ public class Pathfinding : MonoBehaviour
         }
     
         path.Reverse();
+        smothing.SetPath(path);
         return path;
     }
 
@@ -307,6 +310,7 @@ public class Pathfinding : MonoBehaviour
                 node.h = 0;
                 node.f = int.MaxValue;
                 node.parent = null;
+                node.indexSpace = new Vector3(x, 0, y);
                 world[worldPos] = node;
             }
         }
