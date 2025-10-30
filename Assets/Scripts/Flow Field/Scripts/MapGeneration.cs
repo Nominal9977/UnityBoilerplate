@@ -20,7 +20,7 @@ public class MapGeneration : MonoBehaviour
     public Vector2 targetPoint = new Vector2(9, 9);
 
     public static Vector2 startPointStatic = new Vector2(0, 0);
-    public static Vector2 TargetPointStatic = new Vector2(0, 0);
+    public static Vector2 TargetPointStatic = new Vector2(9, 9);
 
 
     private List<GameObject> mapCells = new List<GameObject>();
