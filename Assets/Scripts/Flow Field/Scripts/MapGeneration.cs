@@ -17,10 +17,10 @@ public class MapGeneration : MonoBehaviour
     public GameObject repulsionPointMarkerPrefab;
 
     public Vector2 startPoint = new Vector2(0, 0);
-    public Vector2 targetPoint = new Vector2(9, 9);
+    public Vector2 targetPoint = new Vector2(15, 9);
 
     public static Vector2 startPointStatic = new Vector2(0, 0);
-    public static Vector2 TargetPointStatic = new Vector2(9, 9);
+    public static Vector2 TargetPointStatic = new Vector2(15, 9);
 
 
     private List<GameObject> mapCells = new List<GameObject>();
@@ -159,6 +159,7 @@ public class MapGeneration : MonoBehaviour
         float clampedTargetX = Mathf.Clamp(targetPoint.x, 0, mapWidth - 1);
         float clampedTargetY = Mathf.Clamp(targetPoint.y, 0, mapHeight - 1);
         targetPoint = new Vector2(clampedTargetX, clampedTargetY);
+        TargetPointStatic = targetPoint; 
 
         influencePoints.Clear();
         influencePointPositions.Clear();
