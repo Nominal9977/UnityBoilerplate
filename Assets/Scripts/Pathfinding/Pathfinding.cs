@@ -34,7 +34,6 @@ public class Pathfinding : MonoBehaviour
     
     private int Heuristic(Node n1, Node n2, List<FlowUtility.InfluencePoint> influencePoints)
     {
-        // Simple Manhattan distance for now - we'll add flow field back later
         Vector2Int gridPos1 = WorldToGridIndices(n1.position);
         Vector2Int gridPos2 = WorldToGridIndices(n2.position);
         
@@ -71,30 +70,30 @@ public class Pathfinding : MonoBehaviour
     //Get the cost of a Node
     private int GetCost(Node from, Node to)
     {
-        // Simple cost for now - just distance
         float baseDistance = Vector3.Distance(from.position, to.position);
         return Mathf.RoundToInt(baseDistance * 10);
     }
 
-    private bool IsValid(Vector3 pos)
-    {
-        // Convert world position to grid indices for checking
-        Vector2Int gridPos = WorldToGridIndices(pos);
-        
-        // First check if it's within bounds
-        if (gridPos.x < 0 || gridPos.x >= mapGen.mapWidth || 
-            gridPos.y < 0 || gridPos.y >= mapGen.mapHeight)
-        {
-            return false;
-        }
-        
-        // Check using grid coordinates
-        bool isPositionBlocked = MapGeneration.IsPositionBlocked(new Vector2(gridPos.x, gridPos.y));
-        
-        return !isPositionBlocked;
-    }
+    // private bool IsValid(Vector3 pos)
+    // {
+    //     // Convert world position to grid indices for checking
+    //     Vector2Int gridPos = WorldToGridIndices(pos);
+    //     
+    //     // First check if it's within bounds
+    //     if (gridPos.x < 0 || gridPos.x >= mapGen.mapWidth || 
+    //         gridPos.y < 0 || gridPos.y >= mapGen.mapHeight)
+    //     {
+    //         return false;
+    //     }
+    //     
+    //     // Check using grid coordinates
+    //     bool isPositionBlocked = MapGeneration.IsPositionBlocked(new Vector2(gridPos.x, gridPos.y));
+    //     
+    //     return !isPositionBlocked;
+    // }
 
     //Get the list of neighbors
+    
     private List<Node> GetNeighbours(Node n)
     {
         List<Node> neighbours = new List<Node>();
@@ -114,17 +113,17 @@ public class Pathfinding : MonoBehaviour
         {
             Vector2Int neighborGrid = currentGrid + dir;
         
-            // Check bounds STRICTLY
+            // Check bounds
             if (neighborGrid.x >= 0 && neighborGrid.x < mapGen.mapWidth &&
                 neighborGrid.y >= 0 && neighborGrid.y < mapGen.mapHeight)
             {
                 // Convert grid position back to world position
                 Vector3 neighborWorldPos = GridToWorld(neighborGrid.x, neighborGrid.y);
                 
-                // ONLY get nodes that exist in our precomputed world dictionary
+                // ONLY get nodes that exist in world dictionary
                 if (world.ContainsKey(neighborWorldPos))
                 {
-                    // Check if blocked (using grid coordinates)
+                    // Check if blocked using grid coordinates
                     if (!MapGeneration.IsPositionBlocked(new Vector2(neighborGrid.x, neighborGrid.y)))
                     {
                         Node neighbor = world[neighborWorldPos];
@@ -136,22 +135,7 @@ public class Pathfinding : MonoBehaviour
     
         return neighbours;
     }
-
-    private Node GetOrCreateNode(Vector3 pos)
-    {
-        // ONLY return nodes that already exist in the world dictionary
-        // Don't create new ones on the fly
-        if (world.ContainsKey(pos))
-        {
-            return world[pos];
-        }
-        else
-        {
-            Debug.LogWarning($"Attempted to get node at {pos} which doesn't exist in world!");
-            return null;
-        }
-    }
-
+    
 
     public IEnumerator A_Star_Coroutine(Node start, Node goal, List<FlowUtility.InfluencePoint> influencePoints, System.Action<List<Node>> onComplete)
     {
@@ -188,20 +172,13 @@ public class Pathfinding : MonoBehaviour
             Node current = GetLowestFCost();
             iterations++;
             
-            // Debug every 100 iterations
-            if (iterations % 100 == 0)
-            {
-                Vector2Int currentGrid = WorldToGridIndices(current.position);
-                Debug.Log($"Iteration {iterations}: Current grid ({currentGrid.x},{currentGrid.y}), f={current.f}, frontier size={frontier.Count}");
-            }
-
             // Check if we reached the goal
-            if (current == goal) // Direct node comparison since we're using precomputed nodes
+            if (current == goal)
             {
                 Debug.Log($"Goal found after {iterations} iterations!");
                 List<Node> path = ReconstructPath(current);
                 onComplete?.Invoke(path);
-                debugPath = path; // Store for gizmos
+                debugPath = path; // Store for visualization
                 yield break;
             }
             
@@ -260,9 +237,6 @@ public class Pathfinding : MonoBehaviour
 
         Debug.Log($"No path found after {iterations} iterations. Frontier empty: {frontier.Count == 0}, Max iterations: {iterations >= maxIterations}");
         
-        // Debug: Show some explored positions
-        Debug.Log($"Explored {cameFrom.Count} nodes out of {world.Count} total");
-        
         onComplete?.Invoke(null);
     }
     
@@ -294,7 +268,7 @@ public class Pathfinding : MonoBehaviour
         return new Vector2Int(gx, gy);
     }
     
-    //Set the world grid - precompute ALL valid nodes
+    //Set the world grid
     private void SetWorldGrid()
     {
         world.Clear(); // Clear existing nodes
@@ -337,7 +311,6 @@ public class Pathfinding : MonoBehaviour
             yield break;
         }
         
-        // Debug the start and goal positions
         Debug.Log($"Start point (grid): {mapGen.startPoint}");
         Debug.Log($"Target point (grid): {mapGen.targetPoint}");
         
@@ -360,21 +333,6 @@ public class Pathfinding : MonoBehaviour
         Node startNode = world[startWorldPos];
         Node goalNode = world[goalWorldPos];
         
-        Debug.Log($"Start node (world): {startNode.position}");
-        Debug.Log($"Goal node (world): {goalNode.position}");
-        
-        // Add this debugging check right before StartPathfinding
-        Debug.Log($"Is start blocked? {MapGeneration.IsPositionBlocked(new Vector2(mapGen.startPoint.x, mapGen.startPoint.y))}");
-        Debug.Log($"Is goal blocked? {MapGeneration.IsPositionBlocked(new Vector2(mapGen.targetPoint.x, mapGen.targetPoint.y))}");
-
-        // Also check the neighbors of the goal
-        Vector2Int goalGrid = new Vector2Int((int)mapGen.targetPoint.x, (int)mapGen.targetPoint.y);
-        Debug.Log($"Goal neighbors:");
-        Debug.Log($"  Left ({goalGrid.x-1},{goalGrid.y}): {MapGeneration.IsPositionBlocked(new Vector2(goalGrid.x-1, goalGrid.y))}");
-        Debug.Log($"  Right ({goalGrid.x+1},{goalGrid.y}): {MapGeneration.IsPositionBlocked(new Vector2(goalGrid.x+1, goalGrid.y))}");
-        Debug.Log($"  Down ({goalGrid.x},{goalGrid.y-1}): {MapGeneration.IsPositionBlocked(new Vector2(goalGrid.x, goalGrid.y-1))}");
-        Debug.Log($"  Up ({goalGrid.x},{goalGrid.y+1}): {MapGeneration.IsPositionBlocked(new Vector2(goalGrid.x, goalGrid.y+1))}");
-
         StartPathfinding(startNode, goalNode, mapGen.influencePoints, (path) => {            
             if (path != null)
             {
@@ -406,7 +364,7 @@ public class Pathfinding : MonoBehaviour
             Gizmos.DrawCube(pos, Vector3.one * 0.8f);
         }
 
-        // Draw path in bright green (drawn after so it's on top)
+        // Draw path in bright green
         if (debugPath != null && debugPath.Count > 0)
         {
             Gizmos.color = Color.green;
@@ -454,7 +412,7 @@ public class Pathfinding : MonoBehaviour
         }
     }
     
-    //Start the A* search
+    //Start the A* search on button press
     public void StartPathfinding()
     {
         StartCoroutine(WaitForFlowFieldAndInitialize());
